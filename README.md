@@ -35,6 +35,14 @@ Keywords include:
 - **Fertility and childrearing:** `生育`, `生孩子`, `生娃`, `出生率`, `生育率`, `二孩`, `三孩`, `育儿`, `养娃`
 - **Attitudes and constraints:** `生育意愿`, `不想生`, `不敢生`, `生不起`, `养不起`, `催婚`
 
+## Unit of analysis
+The primary unit of analysis will be an individual Weibo text.
+- For the official account corpus, the unit is an individual user comment under a relevant official post.
+- For the user initiated corpus, the unit is an individual original user post.
+Each observation will include:
+author/account ID, posting date, associated keywords, main text, engagement indicators such as likes, reposts, and comments and attitude scale
+
+
 ## Inclusion and Exclusion Criteria
 
 Content is included when it:
