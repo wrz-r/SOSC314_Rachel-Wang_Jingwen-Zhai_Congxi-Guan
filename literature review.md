@@ -1,1 +1,6 @@
-
+Deng, W., Hsu, J.-H., Löfgren, K., & Cho, W. (2021). Who is leading China’s family planning policy discourse in Weibo? A social media text mining analysis. Policy & Internet, 13(4), 485–501. https://doi.org/10.1002/poi3.264. 
+He, Y., Tom Abdul Wahab, N. E., Muhamad, H., & Liu, D. (2024). The marital and fertility sentiment orientation of Chinese women and its influencing factors–An analysis based on natural language processing. Plos one, 19(2), e0296910. https://doi.org/10.1371/journal.pone.0296910. 
+Li, W., & Zhou, Y. (2025). Fertility anxiety vs. anti-fertility anxiety: Exploring Chinese women’s conflicting attitudes toward childbearing through social media. Frontiers in Psychology, 16, Article 1636612. https://doi.org/10.3389/fpsyg.2025.1636612. 
+Liu, Y. (2024). Perceptions and attitudes of Chinese youth toward late marriage—Text mining based on Sina Weibo content. Communications in Humanities Research, 28(1), 91–98. https://doi.org/10.54254/2753-7064/28/20230137. 
+Wang, X., Fu, J., Fan, J., & Zeng, J. (2026). Dynamic monitoring of public opinion on fertility intentions: based on the intersection of empirical and social media perspectives. Frontiers in Public Health, 14, 1739460. https://doi.org/10.3389/fpubh.2026.1739460. 
+Ye, F. T., & Gao, X. (2026). Why Are Young People Souring on Marriage? Moral and Sentiment Patterns in Chinese Social Media Discourse. Journal of Family Issues. https://doi.org/10.1177/0192513X261465799. 
