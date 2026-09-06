@@ -1,5 +1,5 @@
 # SOSC314_Rachel-Wang_Jingwen-Zhai_Congxi-Guan
-# Sentiment Toward Marriage and Fertility on Weibo
+## Sentiment Toward Marriage and Fertility on Weibo
 
 **Group members:** Ruizhe (Rachel) Wang, Jingwen Zhai, and Congxi Guan.
 
@@ -65,16 +65,17 @@ The project excludes duplicate content, advertisements, spam, obvious bot-genera
 │   ├── official_media_comments_2025.csv
 │   └── weibo_marriage_fertility_2025_final.csv
 │
-├── scripts/
+├──├── scripts/
 │   ├── user_initiated_posts.py
 │   ├── user_initiated_posts_heatmaps.py
+│   ├── official_media_comments/
+│   │   └── chart_official_media_comments.py
 │   └── official_media_comment_scraper/
 │       ├── run_weibo_search_pilot.py
 │       ├── prepare_pilot_sample.py
 │       ├── prepare_official_media_posts.py
 │       ├── collect_sample_comments.py
 │       └── export_official_cookie_comments.py
-│
 └── figures/
     ├── week2_figure_1.png
     ├── week2_figure_2.png
