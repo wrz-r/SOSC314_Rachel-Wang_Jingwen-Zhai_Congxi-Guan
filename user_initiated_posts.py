@@ -322,16 +322,120 @@ print("Saved to:", RAW_OUTPUT)
 
 
 
+# Import the regular-expression module so that we can identify text patterns during the cleaning process.
+import re
+
+# Define the location of the original raw dataset.
+# This file will only be read and will not be overwritten during cleaning.
+RAW_FILE = Path("/content/weibo_marriage_fertility_2025_raw.csv")
+
+# Define the location where the cleaned dataset will be saved.
+CLEANED_FILE = Path("/content/weibo_marriage_fertility_2025_cleaned.csv")
+
+# Define the location where removed observations will be saved.
+REMOVED_FILE = Path("/content/weibo_marriage_fertility_2025_removed_rows.csv")
+
+# Read the original raw dataset.
+df = pd.read_csv(
+    RAW_FILE,
+    dtype={
+        "id": str,
+        "user_id": str,
+        "retweet_id": str
+    }
+)
+# Verify that the dataset contains the text variable required for the subsequent cleaning process.
+if "微博正文" not in df.columns:
+    raise KeyError(
+        f"找不到“微博正文”列。当前列名为：{df.columns.tolist()}"
+    )
+# Create a separate text Series from the Weibo-content column for use in the subsequent text-based cleaning rules.
+text = (
+    df["微博正文"]
+    .fillna("")
+    .astype(str)
+)
+# Report the number of observations in the raw dataset before any cleaning rules are applied.
+print("清理前总行数:", len(df))
 
 
+# Define a list of words and symbols associated with content that is considered irrelevant to the research topic based on manual inspection.
+keywords_to_remove = ["小说", "京东", "拼多多", "超话", "笔趣阁", "国漫", "』"]
+# Combine the exclusion terms into a single regular-expression pattern.
+keyword_pattern = "|".join(
+    re.escape(keyword)
+    for keyword in keywords_to_remove
+)
+# Create a Boolean indicator identifying posts that contain at least one term or symbol from the exclusion list.
+contains_excluded_keyword = text.str.contains(
+    keyword_pattern,
+    regex=True,
+    na=False
+)
+
+# Define a regular-expression pattern covering the main Unicode ranges used for Japanese characters.
+japanese_pattern = (
+    r"[\u3040-\u309F"
+    r"\u30A0-\u30FF"
+    r"\u31F0-\u31FF"
+    r"\uFF66-\uFF9D]"
+)
+# Create a Boolean indicator identifying posts that contain at least one Japanese kana character from the Unicode ranges defined above.
+contains_japanese = text.str.contains(
+    japanese_pattern,
+    regex=True,
+    na=False
+)
+
+# Create an empty list to store the number of rows matched by each individual removal rule.
+removal_counts = []
+# Calculate how many rows contain each term or symbol in the predefined exclusion list.
+for keyword in keywords_to_remove:
+    # Create a Boolean indicator for the current exclusion term and count the number of matching rows.
+    keyword_count = text.str.contains(
+        re.escape(keyword),
+        regex=True,
+        na=False
+    ).sum()
+
+    removal_counts.append({
+        "removal_reason": keyword,
+        "matched_rows": int(keyword_count)
+    })
+# Add the number of rows containing at least one Japanese character to the same summary.
+removal_counts.append({
+    "removal_reason": "Japanese hiragana/katakana",
+    "matched_rows": int(contains_japanese.sum())
+})
+
+removal_summary = pd.DataFrame(removal_counts)
+# Display the number of rows matched by each removal rule.
+display(removal_summary)
+
+# Combine the keyword-based and Japanese-character removal conditions.
+rows_to_delete = (
+    contains_excluded_keyword | contains_japanese
+)
+# Count and report the number of unique rows that satisfy at least one removal condition.
+print(
+    "符合任意删除条件的总行数:", int(rows_to_delete.sum())
+)
 
 
-
-
-
-
-
-
+# Select all rows that do not satisfy any removal condition.
+df_cleaned = df.loc[~rows_to_delete].copy()
+# Save the retained observations as the cleaned dataset.
+df_cleaned.to_csv(
+    CLEANED_FILE,
+    index=False,
+    encoding="utf-8-sig"
+)
+# Report the number of rows before cleaning and the number retained after cleaning.
+print("清理前总行数:", len(df))
+print("清理后总行数:", len(df_cleaned))
+# Display the location of the cleaned dataset.
+print("\n清理后文件保存在:")
+print(CLEANED_FILE)
 
 
 
