@@ -37,11 +37,9 @@ else:
 !pip -q install -r /content/weibo-search-2025-full/requirements.txt
 # Reinstall the specified versions of Scrapy and Twisted to ensure that they are compatible with the crawler and to avoid errors caused by other installed versions.
 !pip -q install --force-reinstall "Scrapy==2.12.0" "Twisted==24.11.0"
-# Display the installed Scrapy version and the versions of its main dependencies.
-!scrapy version -v
+
 
 # Define 2025 as the year used for the pilot data collection.
-PILOT_YEAR = 2025
 # Define the Chinese keywords that will be used to search for Weibo posts related to marriage and fertility.
 KEYWORDS = ["婚姻","结婚","晚婚","不婚","生育","生孩子","不婚不育"]
 
@@ -80,8 +78,6 @@ for i in range(len(month_starts) - 1):
     })
 # Convert the list of monthly date ranges into a pandas DataFrame.
 month_ranges = pd.DataFrame(month_ranges)
-
-display(month_ranges)
 
 
 # Run the pilot data collection across all months of the selected year.
@@ -328,10 +324,8 @@ import re
 # Define the location of the original raw dataset.
 # This file will only be read and will not be overwritten during cleaning.
 RAW_FILE = Path("/content/weibo_marriage_fertility_2025_raw.csv")
-
 # Define the location where the cleaned dataset will be saved.
 CLEANED_FILE = Path("/content/weibo_marriage_fertility_2025_cleaned.csv")
-
 # Define the location where removed observations will be saved.
 REMOVED_FILE = Path("/content/weibo_marriage_fertility_2025_removed_rows.csv")
 
@@ -386,31 +380,6 @@ contains_japanese = text.str.contains(
     regex=True,
     na=False
 )
-
-# Create an empty list to store the number of rows matched by each individual removal rule.
-removal_counts = []
-# Calculate how many rows contain each term or symbol in the predefined exclusion list.
-for keyword in keywords_to_remove:
-    # Create a Boolean indicator for the current exclusion term and count the number of matching rows.
-    keyword_count = text.str.contains(
-        re.escape(keyword),
-        regex=True,
-        na=False
-    ).sum()
-
-    removal_counts.append({
-        "removal_reason": keyword,
-        "matched_rows": int(keyword_count)
-    })
-# Add the number of rows containing at least one Japanese character to the same summary.
-removal_counts.append({
-    "removal_reason": "Japanese hiragana/katakana",
-    "matched_rows": int(contains_japanese.sum())
-})
-
-removal_summary = pd.DataFrame(removal_counts)
-# Display the number of rows matched by each removal rule.
-display(removal_summary)
 
 # Combine the keyword-based and Japanese-character removal conditions.
 rows_to_delete = (
@@ -488,15 +457,10 @@ existing_columns_to_drop = [
     for column in columns_to_drop
     if column in df_cleaned.columns
 ]
-# Identify the variables requested for removal that are not present in the current dataset.
-missing_columns = [
-    column
-    for column in columns_to_drop
-    if column not in df_cleaned.columns
-]
-# Report which variables will be removed and which could not be found.
+
+# Report which variables will be removed.
 print("实际删除的列:", existing_columns_to_drop)
-print("数据中未找到的列:", missing_columns)
+
 # Remove all unwanted variables that are present in the dataset.
 df_cleaned = df_cleaned.drop(
     columns=existing_columns_to_drop
@@ -508,13 +472,6 @@ column_name_mapping = {
     "话题": "topic",
     "评论数": "comment_count",
     "点赞数": "like_count"
-}
-
-# Retain only the renaming instructions for columns that actually exist in the current dataset.
-existing_name_mapping = {
-    chinese_name: english_name
-    for chinese_name, english_name in column_name_mapping.items()
-    if chinese_name in df_cleaned.columns
 }
 
 df_cleaned = df_cleaned.rename(
@@ -534,31 +491,4 @@ df_cleaned.to_csv(
 )
 # Display 
 display(df_cleaned.head())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
