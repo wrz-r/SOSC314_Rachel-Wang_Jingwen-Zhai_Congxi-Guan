@@ -258,13 +258,67 @@ for _, month_row in month_ranges.iterrows():
             print(result.stderr[-1500:])
 
 
+# Review all the results and combine
+# Reload the latest collection log from the saved CSV file.
+collection_log = pd.read_csv(LOG_FILE)
+display(collection_log)
+
+# Create an empty list to store the DataFrame collected for each search keyword.
+all_2025_data = []
+# Loop through all marriage- and fertility-related search keywords.
+for keyword in KEYWORDS:
+    # Define the expected location of the CSV output file
+    file_path = (
+        FULL_REPO
+        / "结果文件"
+        / keyword
+        / f"{keyword}.csv"
+    )
+    # Continue only if an output file exists for the current keyword.
+    if file_path.exists():
+        # Read the keyword-specific CSV file into a pandas DataFrame.
+        keyword_data = pd.read_csv(
+            file_path,
+            dtype={
+                "id": str,
+                "user_id": str,
+                "retweet_id": str
+            }
+        )
+        # Add the search keyword used to retrieve each record.
+        keyword_data["search_query"] = keyword
+        # Add the current keyword's DataFrame to the list of available datasets.
+        all_2025_data.append(
+            keyword_data
+        )
+# Check whether at least one keyword-specific dataset was found.
+if all_2025_data:
+    # Combine all available keyword-specific DataFrames into one dataset.
+    raw_posts_2025 = pd.concat(
+        all_2025_data,
+        ignore_index=True
+    )
+    # Print the total number of raw records across all search-query files.
+    print(
+        "Total raw records collected:",
+        len(raw_posts_2025)
+    )
+    # Display the first five rows so that we can inspect the structure and content of the combined dataset.
+    display(raw_posts_2025.head())
+else:
+    print("No 2025 data found.")
 
 
-
-
-
-
-
+# Define the location and filename for the combined raw dataset.
+RAW_OUTPUT = Path("/content/weibo_marriage_fertility_2025_raw.csv")
+# Export the combined raw Weibo dataset as a CSV file.
+raw_posts_2025.to_csv(
+    RAW_OUTPUT,
+    index=False,
+    encoding="utf-8-sig"
+)
+# Print the output path so that we can confirm where the file was saved.
+print("Saved to:", RAW_OUTPUT)
 
 
 
