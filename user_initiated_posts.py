@@ -439,6 +439,120 @@ print(CLEANED_FILE)
 
 
 
+# Check whether the dataset contains the month variable required to identify observations outside the intended 2025 study period.
+if "month" in df_cleaned.columns:
+    # Convert the month variable into pandas datetime format.
+    month_as_date = pd.to_datetime(
+        df_cleaned["month"].astype(str).str.strip(),
+        errors="coerce"
+    )
+    # Create a Boolean indicator for observations assigned specifically to January 2026.
+    is_january_2026 = (
+        month_as_date.dt.year.eq(2026)
+        & month_as_date.dt.month.eq(1)
+    )
+    print(
+        "month属于2026年1月的行数:",
+        is_january_2026.sum()
+    )
+    # Retain only observations that are not assigned to January 2026.
+    df_cleaned = df_cleaned.loc[
+        ~is_january_2026
+    ].copy()
+else:
+    print("警告：数据中没有找到month列。")
+
+# Define the variables that will not be retained in the final dataset.
+columns_to_drop = [
+    "id",
+    "bid",
+    "用户昵称",
+    "头条文章url",
+    "发布位置",
+    "艾特用户",
+    "转发数",
+    "发布工具",
+    "微博图片url",
+    "微博视频url",
+    "会员类型",
+    "会员等级",
+    "retweet_id",
+    "ip",
+    "user_authentication",
+    "发布时间"
+]
+
+# Identify which variables in the removal list actually exist in the current dataset.
+existing_columns_to_drop = [
+    column
+    for column in columns_to_drop
+    if column in df_cleaned.columns
+]
+# Identify the variables requested for removal that are not present in the current dataset.
+missing_columns = [
+    column
+    for column in columns_to_drop
+    if column not in df_cleaned.columns
+]
+# Report which variables will be removed and which could not be found.
+print("实际删除的列:", existing_columns_to_drop)
+print("数据中未找到的列:", missing_columns)
+# Remove all unwanted variables that are present in the dataset.
+df_cleaned = df_cleaned.drop(
+    columns=existing_columns_to_drop
+)
+
+# Rename the retained Chinese variables in English.
+column_name_mapping = {
+    "微博正文": "post_text",
+    "话题": "topic",
+    "评论数": "comment_count",
+    "点赞数": "like_count"
+}
+
+# Retain only the renaming instructions for columns that actually exist in the current dataset.
+existing_name_mapping = {
+    chinese_name: english_name
+    for chinese_name, english_name in column_name_mapping.items()
+    if chinese_name in df_cleaned.columns
+}
+
+df_cleaned = df_cleaned.rename(
+    columns=existing_name_mapping
+)
+# Report the variables that were renamed and the complete list of columns retained in the final dataset.
+print("完成重命名:", existing_name_mapping)
+print("最终保留的列:", df_cleaned.columns.tolist())
+
+# Save the final analytical dataset.
+FINAL_OUTPUT = ("/content/weibo_marriage_fertility_2025_final.csv")
+# Export the final dataset as a CSV file.
+df_cleaned.to_csv(
+    FINAL_OUTPUT,
+    index=False,
+    encoding="utf-8-sig"
+)
+# Display 
+display(df_cleaned.head())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
