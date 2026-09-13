@@ -70,3 +70,53 @@ print("Rows by month:", dict(sorted(month_counts.items())))
 if MONTHS - month_counts.keys():
     print("No rows found for:", sorted(MONTHS - month_counts.keys()))
 print("Merged CSV:", MERGED)
+
+
+# 3. Deduplicate globally by the first 20 characters of 微博正文.
+# Retain the earliest published row, but combine all original search keywords.
+import sqlite3
+import tempfile
+
+DEDUPED = DATA_DIR / "weibo_2025_6months_prefix20.csv"
+with tempfile.TemporaryDirectory(dir=DATA_DIR) as staging:
+    db = sqlite3.connect(str(Path(staging) / "dedup.sqlite"))
+    db.execute("""CREATE TABLE posts (
+        prefix TEXT PRIMARY KEY, id TEXT, user_id TEXT,
+        body TEXT, published_at TEXT
+    )""")
+    db.execute("""CREATE TABLE keywords (
+        prefix TEXT, keyword TEXT, PRIMARY KEY (prefix, keyword)
+    )""")
+    with MERGED.open(encoding="utf-8-sig", newline="") as source:
+        for row_number, row in enumerate(csv.DictReader(source), start=1):
+            body = row["微博正文"]
+            # Keep blank bodies distinct so the cleaning step can remove/report each one.
+            prefix = body[:20] if body else f"\0EMPTY:{row_number}"
+            db.execute("""INSERT INTO posts VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(prefix) DO UPDATE SET
+                    id=excluded.id, user_id=excluded.user_id,
+                    body=excluded.body, published_at=excluded.published_at
+                WHERE excluded.published_at < posts.published_at
+            """, (prefix, row["id"], row["user_id"], body, row["发布时间"]))
+            db.execute("INSERT OR IGNORE INTO keywords VALUES (?, ?)",
+                       (prefix, row["关键词"]))
+            if row_number % 10000 == 0:
+                db.commit()
+    db.commit()
+
+    with DEDUPED.open("w", encoding="utf-8-sig", newline="") as output:
+        writer = csv.writer(output)
+        writer.writerow(COLUMNS)
+        count = 0
+        query = """SELECT id, user_id, body, published_at,
+          (SELECT group_concat(keyword, '、') FROM (
+              SELECT keyword FROM keywords WHERE prefix=posts.prefix ORDER BY keyword
+          )) AS source_keywords
+          FROM posts ORDER BY published_at, id"""
+        for row in db.execute(query):
+            writer.writerow(row)
+            count += 1
+    db.close()
+
+print("Rows after first-20-character deduplication:", count)
+print("Deduplicated CSV:", DEDUPED)
