@@ -162,5 +162,28 @@ for month, start_date, end_date in month_ranges:
 
 print(f"All {len(month_ranges)} selected monthly searches completed. Run the next cell to combine results.")
 
+# 5. save files to zip
+from pathlib import Path
+from zipfile import ZipFile, ZIP_DEFLATED
+from google.colab import files
 
+content = Path("/content")
+keyword_dir = content / "weibo-search-2025-full" / "结果文件"
 
+csv_files = sorted(keyword_dir.rglob("*.csv")) if keyword_dir.exists() else []
+csv_files += sorted(content.glob("weibo_*.csv"))
+
+if not csv_files:
+    raise FileNotFoundError("没有找到 CSV；请检查 Colab 左侧文件栏中的输出路径。")
+
+zip_path = content / "weibo_csv_backup.zip"
+with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as archive:
+    for path in csv_files:
+        archive.write(path, arcname=path.relative_to(content))
+
+print(f"已打包 {len(csv_files)} 个 CSV：")
+for path in csv_files:
+    print(path)
+print("ZIP:", zip_path)
+
+files.download(str(zip_path))
