@@ -120,3 +120,65 @@ with tempfile.TemporaryDirectory(dir=DATA_DIR) as staging:
 
 print("Rows after first-20-character deduplication:", count)
 print("Deduplicated CSV:", DEDUPED)
+
+
+
+# 4. Remove the requested terms and non-Han/non-Latin letters.
+# Save all removed rows with reasons; leave the merged/deduplicated CSVs untouched.
+import subprocess
+import sys
+try:
+    import regex
+except ImportError:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "regex"], check=True)
+    import importlib
+    import site
+    site.addsitedir(site.getusersitepackages())
+    importlib.invalidate_caches()
+    import regex
+
+FICTION_TERMS = ["小说", "阅读全文", "完结", "大结局", "晋江文学", "txt", "全章节"]
+EXCLUDE_TERMS = ["微博问答", "超话", "恋与深空", "恋与制作人", "微博正文"]
+fiction_pattern = regex.compile("|".join(map(regex.escape, FICTION_TERMS)), regex.IGNORECASE)
+exclude_pattern = regex.compile("|".join(map(regex.escape, EXCLUDE_TERMS)))
+other_script = regex.compile(r"(?!\p{Script=Han}|\p{Script=Latin})\p{L}")
+
+CLEANED = DATA_DIR / "weibo_2025_6months_cleaned.csv"
+REMOVED = DATA_DIR / "weibo_2025_6months_removed.csv"
+counts = Counter()
+with (DEDUPED.open(encoding="utf-8-sig", newline="") as source,
+      CLEANED.open("w", encoding="utf-8-sig", newline="") as clean_out,
+      REMOVED.open("w", encoding="utf-8-sig", newline="") as removed_out):
+    reader = csv.DictReader(source)
+    kept_writer = csv.DictWriter(clean_out, fieldnames=COLUMNS)
+    removed_writer = csv.DictWriter(removed_out, fieldnames=COLUMNS + ["removal_reason"])
+    kept_writer.writeheader()
+    removed_writer.writeheader()
+    for row in reader:
+        body = row["微博正文"] or ""
+        reasons = []
+        if not body.strip():
+            reasons.append("empty_body")
+        fiction = fiction_pattern.search(body)
+        excluded = exclude_pattern.search(body)
+        foreign = other_script.search(body)
+        if fiction:
+            reasons.append(f"fiction_term:{fiction.group()}")
+        if excluded:
+            reasons.append(f"excluded_term:{excluded.group()}")
+        if foreign:
+            reasons.append(f"other_script:{foreign.group()}")
+        if reasons:
+            removed_writer.writerow({**row, "removal_reason": "; ".join(reasons)})
+            counts["removed"] += 1
+            for reason in reasons:
+                counts[reason.split(":")[0]] += 1
+        else:
+            kept_writer.writerow(row)
+            counts["kept"] += 1
+
+print("Kept:", counts["kept"], "| Removed:", counts["removed"])
+print("Rule hits (a post may hit multiple):",
+      {name: counts[name] for name in ("empty_body", "fiction_term", "excluded_term", "other_script")})
+print("Cleaned CSV:", CLEANED)
+print("Removed rows and reasons:", REMOVED)
