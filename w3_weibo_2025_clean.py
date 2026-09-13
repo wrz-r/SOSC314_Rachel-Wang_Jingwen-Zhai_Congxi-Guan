@@ -182,3 +182,88 @@ print("Rule hits (a post may hit multiple):",
       {name: counts[name] for name in ("empty_body", "fiction_term", "excluded_term", "other_script")})
 print("Cleaned CSV:", CLEANED)
 print("Removed rows and reasons:", REMOVED)
+
+
+
+# 5. Plot cleaned post counts by month and by search keyword.
+# Run AFTER cleaning (cell 4). Figures and summary CSVs are saved in DATA_DIR.
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from collections import Counter
+
+MONTH_ORDER = ["2025-01", "2025-02", "2025-04", "2025-05", "2025-10", "2025-11"]
+ENGLISH = {
+    "婚姻": "Marriage", "结婚": "Getting married", "婚恋": "Marriage & dating",
+    "恋爱": "Dating", "对象": "Partner", "伴侣": "Companion",
+    "相亲": "Matchmaking", "单身": "Single", "不婚": "Not marrying",
+    "晚婚": "Late marriage", "恐婚": "Fear of marriage", "催婚": "Marriage pressure",
+    "婚姻登记": "Marriage registration", "彩礼": "Bride price",
+    "离婚冷静期": "Divorce cooling-off period",
+}
+
+# Streaming read limits memory use for large cleaned CSV files.
+if not CLEANED.exists():
+    raise FileNotFoundError(f"Run the cleaning cell first: {CLEANED}")
+month_counts = Counter()
+keyword_counts = Counter()
+unique_posts = 0
+for chunk in pd.read_csv(CLEANED, dtype=str, chunksize=50000, encoding="utf-8-sig"):
+    if "发布时间" not in chunk or "关键词" not in chunk:
+        raise ValueError("Cleaned CSV must contain 发布时间 and 关键词 columns.")
+    unique_posts += len(chunk)
+    months = chunk["发布时间"].fillna("").str.slice(0, 7)
+    month_counts.update(months[months.isin(MONTH_ORDER)].value_counts().to_dict())
+    words = chunk["关键词"].fillna("").str.split("、").explode().str.strip()
+    keyword_counts.update(words[words.ne("")].value_counts().to_dict())
+if not unique_posts:
+    raise ValueError("The cleaned CSV has no posts to plot.")
+
+# Save exact numeric summaries alongside the plots.
+monthly = pd.DataFrame({"month": MONTH_ORDER,
+                        "cleaned_posts": [month_counts[m] for m in MONTH_ORDER]})
+all_keywords = list(ENGLISH) + sorted(set(keyword_counts) - set(ENGLISH))
+by_keyword = pd.DataFrame([(word, keyword_counts[word]) for word in all_keywords],
+                          columns=["keyword", "cleaned_posts"])
+by_keyword = by_keyword.sort_values(["cleaned_posts", "keyword"], ascending=[False, True])
+monthly.to_csv(DATA_DIR / "weibo_2025_cleaned_monthly_counts.csv", index=False, encoding="utf-8-sig")
+by_keyword.to_csv(DATA_DIR / "weibo_2025_cleaned_keyword_counts.csv", index=False, encoding="utf-8-sig")
+
+
+# Chart 1: discrete month totals. Other months were not collected here.
+fig, ax = plt.subplots(figsize=(9, 5.2))
+bars = ax.bar([m[5:] for m in MONTH_ORDER], monthly["cleaned_posts"], color="#3971aa", width=0.67)
+ax.bar_label(bars, padding=3, fmt="%d")
+ax.set(title="Cleaned Weibo posts by month (2025)", xlabel="Month", ylabel="Number of posts")
+ax.spines[["top", "right"]].set_visible(False)
+ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+ax.set_ylim(0, max(monthly["cleaned_posts"]) * 1.17 + 1)
+fig.text(0.02, 0.01,
+         "Note: Only Jan, Feb, Apr, May, Oct, and Nov were imported.",
+         fontsize=8.5, color="#444444")
+fig.tight_layout(rect=(0, 0.09, 1, 1))
+MONTH_PNG = DATA_DIR / "weibo_2025_cleaned_monthly_counts.png"
+fig.savefig(MONTH_PNG, dpi=200, bbox_inches="tight")
+plt.show()
+plt.close(fig)
+
+
+# Chart 2: original search keywords. English labels render reliably in Colab.
+labels = [ENGLISH.get(k, k) for k in by_keyword["keyword"]]
+fig, ax = plt.subplots(figsize=(10, max(5, 0.43 * len(labels) + 1.4)))
+bars = ax.barh(labels, by_keyword["cleaned_posts"], color="#67a19a")
+ax.invert_yaxis()
+ax.bar_label(bars, padding=4, fmt="%d")
+ax.set(title="Cleaned Weibo posts by search keyword (2025)", xlabel="Number of posts")
+ax.spines[["top", "right"]].set_visible(False)
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+ax.set_xlim(0, max(by_keyword["cleaned_posts"]) * 1.18 + 1)
+fig.tight_layout(rect=(0, 0.075, 1, 1))
+KEYWORD_PNG = DATA_DIR / "weibo_2025_cleaned_keyword_counts.png"
+fig.savefig(KEYWORD_PNG, dpi=200, bbox_inches="tight")
+plt.show()
+plt.close(fig)
+
+print(f"Unique cleaned posts: {unique_posts:,}")
+print("Saved charts:", MONTH_PNG, "and", KEYWORD_PNG)
+print("Saved count tables in:", DATA_DIR)
