@@ -1,110 +1,130 @@
-# SOSC314_Rachel-Wang_Jingwen-Zhai_Congxi-Guan
-## Sentiment Toward Marriage and Fertility on Weibo
+# Official-Media Framing and User Discussions of Marriage in China
 
-**Group members:** Ruizhe (Rachel) Wang, Jingwen Zhai, and Congxi Guan.
+**Course:** SOSC 314  
+**Group members:** Ruizhe (Rachel) Wang, Jingwen Zhai, and Congxi Guan
 
 ## Research Question
 
-**How does sentiment toward marriage and fertility differ between user comments on official-media Weibo posts and user-initiated Weibo posts, and how has this difference changed from 2021 to 2025?**
+**How do Chinese official media frame marriage-related issues, and how does this framing differ from the topics and sentiment expressed in user-initiated online discussions?**
 
-## Background
+## Project Purpose and Background
 
-Previous studies have used Weibo to examine public attitudes toward marriage and fertility in China. These discussions often involve economic pressure, parenting costs, gender roles, personal autonomy, and family responsibilities.
+Marriage has become an increasingly important topic in Chinese public discussion. Official media and ordinary social-media users may emphasize different aspects of these issues. Official media may discuss marriage through policy, demographic, legal, or social perspectives, while users may focus more on personal experiences, financial pressure, relationships...
 
-However, it remains unclear whether users express different sentiments when responding to official-media content compared with when they independently initiate discussions. This project addresses this gap by comparing the two types of Weibo discourse.
+This project compares marriage-related discourse in Chinese official media with discussions independently initiated by Weibo users. The purpose is to examine whether institutional media representations of marriage are similar to or different from the topics and sentiment expressed in public online discussions.
 
-## Data Source
+## Data Sources
 
-The primary data source is **Weibo (微博)**. The project uses the open-source tool [dataabc/weibo-search](https://github.com/dataabc/weibo-search), together with project-specific Python scripts for screening posts and collecting public comments.
+The study consists of two Chinese-language text corpora:
 
-The dataset contains only publicly available Weibo content and consists of two corpora:
+1. Full-text articles from Chinese official-media websites
+2. Original marriage-related posts initiated by Weibo users
 
-1. **Official-media comment corpus:** public user comments under relevant posts published by selected verified official-media accounts, including People’s Daily, CCTV News, Xinhua News Agency, China News Service, China Daily, and Healthy China.
+The target observation period is **January 1, 2021 to December 31, 2025**. 
 
-2. **User-initiated post corpus:** original public Weibo posts independently written by users about marriage, fertility, childrearing, or related attitudes.
+### Official-Media Article Corpus
 
-The unit of analysis is one individual user comment for the official-media corpus and one original user post for the user-initiated corpus.
+The official-media corpus contains full-text articles from three major Chinese official-media sources:
+
+- [People.cn](http://people.cn)
+- CCTV
+- China News Service
+
+Articles are identified through keyword-based searches of the selected media websites. After candidate articles are identified, the full text is collected from the original news webpages.
+
+For each article, the dataset retains:
+
+- `media`: media outlet
+- `date`: publication date
+- `title`: article title
+- `text`: full article text
+- `url`: original article URL
+- `matched_keywords`: keywords matched during data collection
+- `relevance_label`: initial relevance-screening result
+
+### User-Initiated Weibo Corpus
+
+The second corpus contains original public Weibo posts independently initiated by users.
+
+We collect these posts using the open-source [dataabc/weibo-search](https://github.com/dataabc/weibo-search) scraper together with project-specific Python scripts. Searches are divided by keyword and time period to improve coverage and make the collection process reproducible.
+
+For each Weibo post, the dataset retains available variables such as:
+
+- post ID
+- user ID
+- post text
+- publication date and time
+- search keyword
+- available engagement indicators
 
 ## Time Period and Keywords
 
-The study covers content posted from **1 January 2021 to 31 December 2025**. The repository currently contains 2025 pilot data.
+The target observation period is 2021–2025. 
+The keyword list includes direct marriage terms and related relationship issues:
 
-Keywords include:
+- **Marriage:** `婚姻`, `结婚`, `婚姻登记`, `结婚登记`, `婚俗`
+- **Relationships:** `婚恋`, `恋爱`, `相亲`, `对象`, `伴侣`
+- **Marriage status and attitudes:** `单身`, `不婚`, `晚婚`, `恐婚`, `催婚`
+- **Marriage-related social issues:** `彩礼`, `高价彩礼`, `离婚`, `离婚冷静期`
 
-- **Marriage and relationships:** `结婚`, `婚姻`, `恋爱`, `相亲`, `单身`, `不婚`, `晚婚`, `恐婚`
-- **Fertility and childrearing:** `生育`, `生孩子`, `生娃`, `出生率`, `生育率`, `二孩`, `三孩`, `育儿`, `养娃`
-- **Attitudes and constraints:** `生育意愿`, `不想生`, `不敢生`, `生不起`, `养不起`, `催婚`
+## Unit of Analysis
 
-## Unit of analysis
-The primary unit of analysis will be an individual Weibo text.
-- For the official account corpus, the unit is an individual user comment under a relevant official post.
-- For the user initiated corpus, the unit is an individual original user post.
-Each observation will include:
-author/account ID, posting date, associated keywords, main text, engagement indicators such as likes, reposts, and comments and attitude scale
+The project uses two document-level units of analysis:
 
+- **Official-media corpus:** one full official-media article
+- **User-initiated corpus:** one original Weibo post
 
 ## Inclusion and Exclusion Criteria
 
-Content is included when it:
+A document is included when it:
 
-- is publicly available on Weibo;
-- was posted between 2021 and 2025;
-- contains relevant marriage, fertility, or family-related keywords;
-- is either a comment under a selected official-media post or an original user-initiated post.
+- was publicly available on the selected media website or Weibo;
+- was published within the observation period;
+- contains at least one predefined marriage-related keyword;
+- substantively discusses marriage or a closely related issue;
+- contains sufficient usable text for analysis;
+- belongs to one of the two defined corpora.
 
-The project excludes duplicate content, advertisements, spam, obvious bot-generated material, unusable text, and posts that contain relevant keywords but are unrelated to marriage, fertility, or family formation.
+The project excludes:
 
-## Method
+- duplicate documents;
+- advertisements and commercial marketing;
+- spam or obvious automated content;
+- empty or inaccessible documents;
+- keyword matches unrelated to marriage;
+- documents containing only incidental marriage references;
+- records without sufficient text for analysis.
 
-1. Search Weibo by keyword and time period.
-2. Screen official-media posts using a predefined account list and relevance criteria.
-3. Collect public comments under selected official-media posts.
-4. Collect relevant original user-initiated posts.
-5. Compare sentiment between the two corpora and examine changes over time.
+## Research Method
 
-#### Potential Analysis Method: Latent Semantic Scaling (LSS)
-Latent Semantic Scaling (LSS) is a semi-supervised, embedding-based text analysis method that can be used to measure attitudes along a predefined semantic dimension. 
-- By providing a small set of seed words representing the two ends of an attitude dimension, such as positive and negative attitudes, the model identifies semantically related words and estimates their positions along the same dimension.
-- The attitude dimension could be defined on a scale from −1 (negative) to +1 (positive). LSS could therefore provide a scalable way to assign attitude scores to a large number of Weibo posts and examine changes in marriage and fertility attitudes over time.
+The project uses comparative computational text analysis to examine official-media framing and user-initiated online discussion.
 
-## Feasibility
-**Data**  
-We conducted a small pilot scrape of 2025 Weibo data using an open-source web-scraping tool and Python, retrieving 46 eligible official-media posts and 967 valid user comments from four major national media accounts. The data showed no missing comment text or duplicate comment IDs, suggesting that Weibo provides sufficiently complete and accessible data for our research.
+The main research process is:
 
-**Analysis**  
-We manually coded attitudes on a continuous scale from −1 (negative) to 0 (neutral) to +1 (positive), and the preliminary results show meaningful variation across marriage and fertility-related topics. This suggests that the data contain sufficient attitudinal variation to support systematic analysis of public discourse.
-
-**Improvement**  
-The pilot revealed that fertility-related content is much more prevalent than marriage-related content and that comment volume varies substantially across months, requiring broader keywords and a more balanced sampling strategy across years, months, and topics. 
-While attitudes cannot be reliably inferred from keywords alone, and automated classification may misidentify descriptive statements, negation, or nuanced expressions. For the current pilot sample, manual coding and correction are therefore still necessary. 
-
+1. Search official-media websites for marriage-related articles using predefined keywords.
+2. Retrieve the full text of relevant official-media articles.
+3. Search Weibo by keyword and time period using [dataabc/weibo-search](https://github.com/dataabc/weibo-search).
+4. Retain original user-initiated Weibo posts related to marriage.
+5. Identify the major topics and frames in official-media articles.
+6. Identify the major topics and sentiment expressed in user-initiated posts.
+7. Compare the two corpora and examine changes across media sources and over time.
 
 ## Repository Structure
 
 ```text
 .
 ├── README.md
-├── literature review.md
-│
-├── data/
-│   ├── official_media_comments_2025.csv
-│   ├── weibo_marriage_fertility_2025_final.csv
-│   └── weibo_2021_marriage_attitude_coded.csv
-│
-├──├── scripts/
-│   ├── user_initiated_posts.py
-│   ├── user_initiated_posts_heatmaps.py
-│   ├── official_media_comments/
-│   │   └── chart_official_media_comments.py
-│   └── official_media_comment_scraper/
-│       ├── run_weibo_search_pilot.py
-│       ├── prepare_pilot_sample.py
-│       ├── prepare_official_media_posts.py
-│       ├── collect_sample_comments.py
-│       └── export_official_cookie_comments.py
-└── figures/
-    ├── week2_figure_1.png
-    ├── week2_figure_2.png
-    ├── week2_figure_3.png
-    └── week2_figure_4.png
-
+├── literature review
+├── data
+│   ├── official-media articles
+│   ├── user-initiated Weibo posts
+│   └── pilot data
+├── scripts
+│   ├── official-media data collection and processing
+│   ├── user-initiated Weibo data collection and processing
+│   └── data visualization
+└── figures
+    ├── official-media figures
+    ├── user-discussion figures
+    └── pilot-study figures
+```
