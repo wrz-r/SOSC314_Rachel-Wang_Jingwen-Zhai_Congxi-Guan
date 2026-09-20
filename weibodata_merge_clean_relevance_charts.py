@@ -361,3 +361,368 @@ print("Duplicate rows removed:", len(duplicate_removed))
 print("Final unique rows:", len(retained))
 print("Final CSV:", FINAL_FILE)
 print("Duplicate audit:", DUPLICATE_REMOVED_FILE)
+
+
+
+# Create two interactive ECharts figures from final query_keyword values.
+subprocess.run(
+    [sys.executable, "-m", "pip", "install", "-q", "pyecharts"],
+    check=True,
+)
+
+try:
+    from IPython.display import display
+except ImportError:
+    def display(_object):
+        pass
+from pyecharts import options as opts
+from pyecharts.charts import Bar, Boxplot
+from pyecharts.globals import ThemeType
+
+if "query_keyword" not in retained.columns:
+    raise ValueError(
+        "The final data do not contain query_keyword, so keyword figures cannot be created."
+    )
+
+chart_data = retained.copy()
+normalized_keyword = (
+    chart_data["query_keyword"]
+    .where(chart_data["query_keyword"].notna(), "")
+    .astype(str)
+    .str.strip()
+)
+missing_keyword_mask = normalized_keyword.str.casefold().isin(
+    {"", "nan", "none", "null", "na", "<na>"}
+)
+missing_keyword_rows = int(missing_keyword_mask.sum())
+chart_data = chart_data.loc[~missing_keyword_mask].copy()
+chart_data["query_keyword"] = normalized_keyword.loc[~missing_keyword_mask]
+if chart_data.empty:
+    raise ValueError("All query_keyword values are missing or NaN-like.")
+
+KEYWORD_ENGLISH = {
+    "婚姻": "Marriage",
+    "结婚": "Getting married",
+    "婚恋": "Marriage and dating",
+    "恋爱": "Romantic relationships",
+    "对象": "Romantic partner",
+    "伴侣": "Partner or companion",
+    "相亲": "Matchmaking",
+    "单身": "Singlehood",
+    "不婚": "Non-marriage",
+    "晚婚": "Late marriage",
+    "恐婚": "Fear of marriage",
+    "催婚": "Marriage pressure",
+    "婚姻登记": "Marriage registration",
+    "彩礼": "Bride price",
+    "离婚冷静期": "Divorce cooling-off period",
+}
+unmapped_keywords = sorted(
+    set(chart_data["query_keyword"]) - set(KEYWORD_ENGLISH)
+)
+if unmapped_keywords:
+    raise ValueError(
+        "Add English translations for these unexpected query_keyword values: "
+        + repr(unmapped_keywords)
+    )
+chart_data["query_keyword_english"] = chart_data["query_keyword"].map(
+    KEYWORD_ENGLISH
+)
+
+palette = [
+    "#355C7D", "#6C5B7B", "#C06C84", "#F67280", "#F8B195",
+    "#2A9D8F", "#E9C46A", "#F4A261", "#E76F51", "#457B9D",
+    "#1D3557", "#7A5195", "#EF5675", "#FFA600", "#4D908E",
+]
+
+# Figure 1: ranked counts in the final analytic corpus.
+keyword_counts = chart_data["query_keyword_english"].value_counts().sort_values()
+keyword_shares = (keyword_counts / keyword_counts.sum() * 100).round(2)
+keyword_summary = pd.DataFrame({
+    "query_keyword_english": keyword_counts.index,
+    "retained_posts": keyword_counts.values,
+    "share_percent": keyword_shares.values,
+}).sort_values("retained_posts", ascending=False)
+english_to_chinese = {english: chinese for chinese, english in KEYWORD_ENGLISH.items()}
+keyword_summary.insert(
+    0,
+    "query_keyword_chinese",
+    keyword_summary["query_keyword_english"].map(english_to_chinese),
+)
+KEYWORD_COUNTS_FILE = OUTPUT_DIR / "query_keyword_final_counts.csv"
+keyword_summary.to_csv(KEYWORD_COUNTS_FILE, index=False, encoding="utf-8-sig")
+
+count_items = [
+    opts.BarItem(
+        name=keyword,
+        value=int(value),
+        itemstyle_opts=opts.ItemStyleOpts(
+            color=palette[index % len(palette)],
+            border_radius=[0, 7, 7, 0],
+        ),
+    )
+    for index, (keyword, value) in enumerate(keyword_counts.items())
+]
+count_chart = (
+    Bar(init_opts=opts.InitOpts(
+        theme=ThemeType.LIGHT, width="1200px", height="720px",
+        bg_color="#FAFAF8",
+    ))
+    .add_xaxis(keyword_counts.index.tolist())
+    .add_yaxis(
+        "Retained posts", count_items, category_gap="38%",
+        label_opts=opts.LabelOpts(is_show=True, position="right", font_size=12),
+    )
+    .reversal_axis()
+    .set_global_opts(
+        title_opts=opts.TitleOpts(
+            title="Marriage-related Weibo posts retained by query keyword",
+            subtitle=(
+                "Final cleaned, high-relevance, deduplicated corpus; "
+                "counts describe this sample, not total Weibo popularity."
+            ),
+            pos_left="center",
+        ),
+        legend_opts=opts.LegendOpts(is_show=False),
+        tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="shadow"),
+        toolbox_opts=opts.ToolboxOpts(
+            is_show=True,
+            feature=opts.ToolBoxFeatureOpts(
+                save_as_image=opts.ToolBoxFeatureSaveAsImageOpts(
+                    type_="png", title="Save as PNG", pixel_ratio=2
+                ),
+                data_view=opts.ToolBoxFeatureDataViewOpts(
+                    title="View data", is_read_only=True
+                ),
+            ),
+        ),
+        xaxis_opts=opts.AxisOpts(
+            name="Number of retained posts",
+            splitline_opts=opts.SplitLineOpts(is_show=True),
+        ),
+        yaxis_opts=opts.AxisOpts(
+            axislabel_opts=opts.LabelOpts(font_size=13),
+        ),
+        graphic_opts=[opts.GraphicText(
+            graphic_item=opts.GraphicItem(left="center", bottom=8),
+            graphic_textstyle_opts=opts.GraphicTextStyleOpts(
+                text=(
+                    f"N = {len(chart_data):,} posts with valid query_keyword; "
+                    f"{missing_keyword_rows:,} missing/NaN-like rows excluded."
+                ),
+                font="12px sans-serif", graphic_basicstyle_opts=opts.GraphicBasicStyleOpts(
+                    fill="#666666"
+                ),
+            ),
+        )],
+    )
+)
+COUNT_CHART_FILE = OUTPUT_DIR / "figure1_query_keyword_counts.html"
+count_chart.render(str(COUNT_CHART_FILE))
+
+# Figure 2: distribution of post length by keyword. Length is measured using Han (chinese) characters only, so URLs, Latin text, punctuation, spaces, and emoji do not inflate the comparison.
+chart_data["han_character_count"] = chart_data["微博正文"].map(
+    lambda text: len(regex.findall(r"\p{Script=Han}", str(text)))
+)
+keyword_order = (
+    chart_data.groupby("query_keyword_english")["han_character_count"]
+    .median()
+    .sort_values()
+    .index.tolist()
+)
+length_distributions = [
+    chart_data.loc[
+        chart_data["query_keyword_english"] == keyword,
+        "han_character_count",
+    ].tolist()
+    for keyword in keyword_order
+]
+
+tukey_box_data = []
+full_range_box_data = []
+tukey_statistics = {}
+for keyword, values in zip(keyword_order, length_distributions):
+    values_series = pd.Series(values, dtype="float64")
+    q1 = float(values_series.quantile(0.25))
+    median = float(values_series.median())
+    q3 = float(values_series.quantile(0.75))
+    iqr = q3 - q1
+    lower_fence = q1 - 1.5 * iqr
+    upper_fence = q3 + 1.5 * iqr
+    lower_whisker = float(values_series[values_series >= lower_fence].min())
+    upper_whisker = float(values_series[values_series <= upper_fence].max())
+    outlier_count = int(
+        ((values_series < lower_fence) | (values_series > upper_fence)).sum()
+    )
+    tukey_box_data.append([
+        lower_whisker, q1, median, q3, upper_whisker
+    ])
+    full_range_box_data.append([
+        float(values_series.min()), q1, median, q3, float(values_series.max())
+    ])
+    tukey_statistics[keyword] = {
+        "tukey_lower_whisker": lower_whisker,
+        "tukey_upper_whisker": upper_whisker,
+        "tukey_outlier_posts": outlier_count,
+        "tukey_outlier_percent": outlier_count / len(values_series) * 100,
+    }
+
+length_summary = (
+    chart_data.groupby(["query_keyword", "query_keyword_english"])
+    ["han_character_count"]
+    .agg(
+        posts="size",
+        mean_han_characters="mean",
+        median_han_characters="median",
+        minimum_han_characters="min",
+        q1_han_characters=lambda values: values.quantile(0.25),
+        q3_han_characters=lambda values: values.quantile(0.75),
+        maximum_han_characters="max",
+    )
+    .reset_index()
+    .sort_values("median_han_characters", ascending=False)
+)
+for column in [
+    "mean_han_characters", "median_han_characters",
+    "q1_han_characters", "q3_han_characters",
+]:
+    length_summary[column] = length_summary[column].round(2)
+for statistic in [
+    "tukey_lower_whisker", "tukey_upper_whisker",
+    "tukey_outlier_posts", "tukey_outlier_percent",
+]:
+    length_summary[statistic] = length_summary["query_keyword_english"].map(
+        lambda keyword: tukey_statistics[keyword][statistic]
+    )
+length_summary["tukey_outlier_percent"] = (
+    length_summary["tukey_outlier_percent"].round(2)
+)
+LENGTH_SUMMARY_FILE = OUTPUT_DIR / "query_keyword_text_length_summary.csv"
+length_summary.to_csv(LENGTH_SUMMARY_FILE, index=False, encoding="utf-8-sig")
+
+length_chart = Boxplot(init_opts=opts.InitOpts(
+    theme=ThemeType.LIGHT, width="1400px", height="760px",
+    bg_color="#FAFAF8",
+))
+length_chart.add_xaxis(keyword_order)
+length_chart.add_yaxis(
+    "Post length",
+    tukey_box_data,
+    itemstyle_opts=opts.ItemStyleOpts(
+        color="#6C5B7B", border_color="#355C7D", border_width=1.5
+    ),
+)
+length_chart.set_global_opts(
+    title_opts=opts.TitleOpts(
+        title="Typical distribution of Weibo post length by query keyword",
+        subtitle=(
+            "Standard Tukey box plot: whiskers stop at the most extreme values "
+            "within 1.5 × IQR, so a few very long posts do not compress the boxes."
+        ),
+        pos_left="center",
+    ),
+    legend_opts=opts.LegendOpts(is_show=False),
+    tooltip_opts=opts.TooltipOpts(trigger="item"),
+    toolbox_opts=opts.ToolboxOpts(
+        is_show=True,
+        feature=opts.ToolBoxFeatureOpts(
+            save_as_image=opts.ToolBoxFeatureSaveAsImageOpts(
+                type_="png", title="Save as PNG", pixel_ratio=2
+            ),
+            data_view=opts.ToolBoxFeatureDataViewOpts(
+                title="View data", is_read_only=True
+            ),
+        ),
+    ),
+    xaxis_opts=opts.AxisOpts(
+        name="Query keyword",
+        axislabel_opts=opts.LabelOpts(rotate=28, interval=0, font_size=11),
+    ),
+    yaxis_opts=opts.AxisOpts(
+        name="Chinese characters per post",
+        min_=0,
+        splitline_opts=opts.SplitLineOpts(is_show=True),
+    ),
+    graphic_opts=[opts.GraphicText(
+        graphic_item=opts.GraphicItem(left="center", bottom=5),
+        graphic_textstyle_opts=opts.GraphicTextStyleOpts(
+            text=(
+                "Extreme posts remain in the dataset and summary CSV but are omitted "
+                "from this main view; see Figure 2B for the complete range."
+            ),
+            font="12px sans-serif", graphic_basicstyle_opts=opts.GraphicBasicStyleOpts(
+                fill="#666666"
+            ),
+        ),
+    )],
+)
+LENGTH_CHART_FILE = OUTPUT_DIR / "figure2a_post_length_tukey_boxplot.html"
+length_chart.render(str(LENGTH_CHART_FILE))
+
+# Figure 2B preserves each keyword's actual minimum and maximum while a logarithmic y-axis compresses the long right tail. This is a transparency check rather than the preferred main report figure.
+full_range_chart = Boxplot(init_opts=opts.InitOpts(
+    theme=ThemeType.LIGHT, width="1400px", height="760px",
+    bg_color="#FAFAF8",
+))
+full_range_chart.add_xaxis(keyword_order)
+full_range_chart.add_yaxis(
+    "Post length",
+    full_range_box_data,
+    itemstyle_opts=opts.ItemStyleOpts(
+        color="#C06C84", border_color="#6C5B7B", border_width=1.5
+    ),
+)
+full_range_chart.set_global_opts(
+    title_opts=opts.TitleOpts(
+        title="Full range of Weibo post length by query keyword",
+        subtitle=(
+            "Logarithmic y-axis; every keyword's observed minimum and maximum are "
+            "included, allowing rare very long posts to remain visible."
+        ),
+        pos_left="center",
+    ),
+    legend_opts=opts.LegendOpts(is_show=False),
+    tooltip_opts=opts.TooltipOpts(trigger="item"),
+    toolbox_opts=opts.ToolboxOpts(
+        is_show=True,
+        feature=opts.ToolBoxFeatureOpts(
+            save_as_image=opts.ToolBoxFeatureSaveAsImageOpts(
+                type_="png", title="Save as PNG", pixel_ratio=2
+            ),
+            data_view=opts.ToolBoxFeatureDataViewOpts(
+                title="View data", is_read_only=True
+            ),
+        ),
+    ),
+    xaxis_opts=opts.AxisOpts(
+        name="Query keyword",
+        axislabel_opts=opts.LabelOpts(rotate=28, interval=0, font_size=11),
+    ),
+    yaxis_opts=opts.AxisOpts(
+        type_="log", log_base=10, min_=1,
+        name="Chinese characters per post (log scale)",
+        splitline_opts=opts.SplitLineOpts(is_show=True),
+    ),
+    graphic_opts=[opts.GraphicText(
+        graphic_item=opts.GraphicItem(left="center", bottom=5),
+        graphic_textstyle_opts=opts.GraphicTextStyleOpts(
+            text=(
+                "Use Figure 2A for comparison of typical posts; this log-scale panel "
+                "shows the long tail without deleting or winsorizing observations."
+            ),
+            font="12px sans-serif", graphic_basicstyle_opts=opts.GraphicBasicStyleOpts(
+                fill="#666666"
+            ),
+        ),
+    )],
+)
+FULL_RANGE_CHART_FILE = OUTPUT_DIR / "figure2b_post_length_full_range_log_scale.html"
+full_range_chart.render(str(FULL_RANGE_CHART_FILE))
+
+print("Figure 1:", COUNT_CHART_FILE)
+display(count_chart.render_notebook())
+print("Figure 2A (recommended main figure):", LENGTH_CHART_FILE)
+display(length_chart.render_notebook())
+print("Figure 2B (full-range robustness view):", FULL_RANGE_CHART_FILE)
+display(full_range_chart.render_notebook())
+print("Use the camera icon in the upper-right toolbox to save any chart as PNG.")
