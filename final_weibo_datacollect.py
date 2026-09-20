@@ -215,3 +215,169 @@ ITEM_PIPELINES = {{
 """
 settings_path.write_text(settings_text, encoding="utf-8")
 print("Early-cleaning pipeline installed.")
+
+
+# Crawl until the valid-candidate target is reached in every five-day keyword stratum.
+import csv
+import itertools
+import os
+import subprocess
+import time
+from collections import deque
+from datetime import date, timedelta
+
+SOURCE_COLUMNS = [
+    "id", "user_id", "微博正文", "发布时间"
+]
+SAMPLE_COLUMNS = ["sampling_year", "block_start", "block_end", "query_keyword"] + SOURCE_COLUMNS
+LOG_COLUMNS = [
+    "task_id", "block_start", "block_end", "keyword", "valid_candidate_target",
+    "raw_result_safety_ceiling",
+    "valid_candidates", "return_code", "elapsed_seconds", "status", "diagnostic_log",
+]
+
+CANDIDATE_FILE = DATA_DIR / "eligible_candidates.csv"
+REMOVED_FILE = DATA_DIR / "removed_during_crawl.csv"
+TASK_LOG = DATA_DIR / "collection_task_log.csv"
+DEBUG_DIR = DATA_DIR / "crawler_logs"
+DEBUG_DIR.mkdir(exist_ok=True)
+
+def make_blocks(start_date, end_date, block_days):
+    """Create continuous windows and merge a short final remainder backward."""
+    blocks = []
+    current = start_date
+    while current <= end_date:
+        block_end = min(current + timedelta(days=block_days - 1), end_date)
+        blocks.append((current, block_end))
+        current = block_end + timedelta(days=1)
+
+    if len(blocks) > 1:
+        last_start, last_end = blocks[-1]
+        last_length = (last_end - last_start).days + 1
+        if last_length < block_days:
+            previous_start, _ = blocks[-2]
+            blocks[-2] = (previous_start, last_end)
+            blocks.pop()
+
+    return [(start.isoformat(), end.isoformat()) for start, end in blocks]
+
+def count_csv_rows(path):
+    if not path.exists() or path.stat().st_size == 0:
+        return 0
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return max(0, sum(1 for _ in csv.reader(handle)) - 1)
+
+def append_rows(path, fieldnames, rows):
+    rows = list(rows)
+    if not rows:
+        return
+    new_file = not path.exists() or path.stat().st_size == 0
+    with path.open("a", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        if new_file:
+            writer.writeheader()
+        writer.writerows(rows)
+
+completed = set()
+if TASK_LOG.exists():
+    with TASK_LOG.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("status") == "done":
+                completed.add(row["task_id"])
+
+blocks = make_blocks(START_DATE, END_DATE, DAYS_PER_BLOCK)
+tasks = [(start, end, keyword) for start, end in blocks for keyword in KEYWORDS]
+print("Five-day blocks:", len(blocks), "| Total keyword tasks:", len(tasks))
+print("Target valid candidate slots:", len(tasks) * VALID_CANDIDATE_TARGET)
+
+consecutive_zero_tasks = 0
+for task_number, (block_start, block_end, keyword) in enumerate(tasks, start=1):
+    task_id = f"{block_start}_{block_end}_{keyword}"
+    if task_id in completed:
+        print(f"[{task_number}/{len(tasks)}] Already completed: {task_id}")
+        continue
+
+    source_file = FULL_REPO / "结果文件" / keyword / f"{keyword}.csv"
+    rows_before = count_csv_rows(source_file)
+    diagnostic = DEBUG_DIR / f"{block_start}_{block_end}_{keyword}.log"
+
+    environment = os.environ.copy()
+    environment.update({
+        "WEIBO_COOKIE": WEIBO_COOKIE,
+        "WEIBO_KEYWORDS": json.dumps([keyword], ensure_ascii=False),
+        "WEIBO_START_DATE": block_start,
+        "WEIBO_END_DATE": block_end,
+        "WEIBO_TYPE": "1",          # original posts only
+        "WEIBO_CONTAIN_TYPE": "0",  # no media restriction
+        "WEIBO_REGION": json.dumps(["全部"], ensure_ascii=False),
+        "WEIBO_FURTHER_THRESHOLD": "46",
+        # The early-cleaning pipeline normally stops first. This is only a safety ceiling.
+        "WEIBO_LIMIT_RESULT": str(MAX_RAW_RESULTS_PER_STRATUM),
+        "WEIBO_VALID_TARGET": str(VALID_CANDIDATE_TARGET),
+        "WEIBO_FETCH_IP": "0",
+        "WEIBO_REMOVED_FILE": str(REMOVED_FILE),
+    })
+
+    print(f"[{task_number}/{len(tasks)}] {block_start} to {block_end} | {keyword}", flush=True)
+    started = time.monotonic()
+    with diagnostic.open("w", encoding="utf-8") as log_handle:
+        result = subprocess.run(
+            ["scrapy", "crawl", "search",
+             "-s", "LOG_LEVEL=INFO",
+             "-s", f"DOWNLOAD_DELAY={DOWNLOAD_DELAY}",
+             "-s", "RANDOMIZE_DOWNLOAD_DELAY=True",
+             "-s", "CONCURRENT_REQUESTS=1"],
+            cwd=FULL_REPO,
+            env=environment,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+    new_valid_rows = []
+    if source_file.exists():
+        with source_file.open(encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in itertools.islice(reader, rows_before, None):
+                new_valid_rows.append({
+                    "sampling_year": YEAR,
+                    "block_start": block_start,
+                    "block_end": block_end,
+                    "query_keyword": keyword,
+                    **{column: row.get(column, "") for column in SOURCE_COLUMNS},
+                })
+    append_rows(CANDIDATE_FILE, SAMPLE_COLUMNS, new_valid_rows)
+
+    status = "done" if result.returncode == 0 else "failed"
+    record = {
+        "task_id": task_id,
+        "block_start": block_start,
+        "block_end": block_end,
+        "keyword": keyword,
+        "valid_candidate_target": VALID_CANDIDATE_TARGET,
+        "raw_result_safety_ceiling": MAX_RAW_RESULTS_PER_STRATUM,
+        "valid_candidates": len(new_valid_rows),
+        "return_code": result.returncode,
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "status": status,
+        "diagnostic_log": str(diagnostic),
+    }
+    append_rows(TASK_LOG, LOG_COLUMNS, [record])
+    print("  Eligible after early cleaning:", len(new_valid_rows),
+          "| Return code:", result.returncode)
+
+    if result.returncode != 0:
+        with diagnostic.open(encoding="utf-8", errors="replace") as handle:
+            print("".join(deque(handle, maxlen=40)))
+        raise RuntimeError(f"Crawler failed. Review {diagnostic}")
+
+    consecutive_zero_tasks = consecutive_zero_tasks + 1 if not new_valid_rows else 0
+    if consecutive_zero_tasks >= 5:
+        raise RuntimeError(
+            "Five consecutive tasks produced zero eligible candidates. "
+            "Check whether the cookie has expired and inspect the crawler logs before continuing."
+        )
+
+print("Candidate collection complete:", CANDIDATE_FILE)
+print("Early-removal audit:", REMOVED_FILE)
+print("Task log:", TASK_LOG)
