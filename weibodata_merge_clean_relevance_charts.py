@@ -270,3 +270,94 @@ print("High relevance:", len(relevant))
 print("Borderline (saved for review):", len(borderline))
 print("Irrelevant:", len(irrelevant))
 print(relevance_scored["relevance_rule"].value_counts().rename("rows").to_string())
+
+
+# Deduplicate high-relevance posts by their complete ordered Han (chinese words) sequence.
+def han_only(text):
+    return "".join(regex.findall(r"\p{Script=Han}", str(text)))
+
+relevant["han_dedup_key"] = relevant["微博正文"].map(han_only)
+relevant["published_dt"] = pd.to_datetime(relevant["发布时间"], errors="coerce")
+relevant["_original_order"] = range(len(relevant))
+
+# Valid timestamps come first. Within each duplicate group, the earliest timestamp is retained. Ties are resolved deterministically by source file, source row, and original merged order.
+ordered = relevant.sort_values(
+    ["han_dedup_key", "published_dt", "source_file", "source_row", "_original_order"],
+    ascending=[True, True, True, True, True],
+    na_position="last",
+    kind="mergesort",
+)
+
+kept_mask = ~ordered.duplicated("han_dedup_key", keep="first")
+retained = ordered[kept_mask].copy()
+duplicate_removed = ordered[~kept_mask].copy()
+
+kept_reference_columns = ["han_dedup_key", "发布时间", "source_file", "source_row"]
+if "id" in retained.columns:
+    kept_reference_columns.insert(1, "id")
+kept_reference = retained[kept_reference_columns].copy()
+kept_reference = kept_reference.rename(columns={
+    "id": "retained_id",
+    "发布时间": "retained_发布时间",
+    "source_file": "retained_source_file",
+    "source_row": "retained_source_row",
+})
+duplicate_removed = duplicate_removed.merge(
+    kept_reference, on="han_dedup_key", how="left", validate="many_to_one"
+)
+duplicate_removed["duplicate_removal_reason"] = "identical_complete_han_sequence"
+
+def json_unique(values):
+    cleaned_values = sorted({str(value).strip() for value in values if str(value).strip()})
+    return json.dumps(cleaned_values, ensure_ascii=False)
+
+metadata = relevant.groupby("han_dedup_key", sort=False).agg(
+    duplicate_group_size=("han_dedup_key", "size"),
+    all_source_files=("source_file", json_unique),
+).reset_index()
+if "query_keyword" in relevant.columns:
+    keyword_metadata = relevant.groupby("han_dedup_key", sort=False).agg(
+        all_query_keywords=("query_keyword", json_unique)
+    ).reset_index()
+    metadata = metadata.merge(keyword_metadata, on="han_dedup_key", how="left")
+
+stratum_columns = [
+    column for column in ["block_start", "block_end", "query_keyword"]
+    if column in relevant.columns
+]
+if stratum_columns:
+    relevant["_sampling_stratum"] = relevant[stratum_columns].astype(str).agg("|".join, axis=1)
+    stratum_metadata = relevant.groupby("han_dedup_key", sort=False).agg(
+        all_sampling_strata=("_sampling_stratum", json_unique)
+    ).reset_index()
+    metadata = metadata.merge(stratum_metadata, on="han_dedup_key", how="left")
+
+retained = retained.merge(metadata, on="han_dedup_key", how="left", validate="one_to_one")
+retained = retained.sort_values(
+    ["published_dt", "source_file", "source_row"],
+    na_position="last",
+    kind="mergesort",
+)
+
+internal_columns = [
+    "published_dt", "_original_order", "_sampling_stratum",
+    "cleaning_removal_reason",
+]
+retained = retained.drop(
+    columns=[column for column in internal_columns if column in retained.columns]
+)
+duplicate_removed = duplicate_removed.drop(
+    columns=[column for column in ["published_dt", "_original_order", "_sampling_stratum"]
+             if column in duplicate_removed.columns]
+)
+
+FINAL_FILE = OUTPUT_DIR / "eligible_candidates_merged_cleaned_relevant_han_deduplicated.csv"
+DUPLICATE_REMOVED_FILE = OUTPUT_DIR / "removed_as_han_sequence_duplicates.csv"
+retained.to_csv(FINAL_FILE, index=False, encoding="utf-8-sig")
+duplicate_removed.to_csv(DUPLICATE_REMOVED_FILE, index=False, encoding="utf-8-sig")
+
+print("High-relevance rows before deduplication:", len(relevant))
+print("Duplicate rows removed:", len(duplicate_removed))
+print("Final unique rows:", len(retained))
+print("Final CSV:", FINAL_FILE)
+print("Duplicate audit:", DUPLICATE_REMOVED_FILE)
