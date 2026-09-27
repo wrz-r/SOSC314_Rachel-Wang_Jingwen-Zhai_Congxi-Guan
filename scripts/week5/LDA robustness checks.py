@@ -119,4 +119,95 @@ def load_corpus(path, corpus_name):
     return df, dtm, vocabulary
 
 
+def row_normalize(matrix):
+    matrix = np.asarray(matrix, dtype=float)
+    norm = np.linalg.norm(matrix, axis=1, keepdims=True)
+    return matrix / np.maximum(norm, 1e-12)
+
+
+def topic_diversity(components, top_n=TOP_N):
+    top = np.argsort(components, axis=1)[:, ::-1][:, :top_n]
+    return len(np.unique(top)) / float(components.shape[0] * top_n)
+
+
+def npmi_coherence(dtm, components, top_n=10):
+    """Document-level NPMI over each topic's top words; higher is better."""
+    binary = dtm.copy().astype(bool).astype(np.int8).tocsc()
+    n_docs = binary.shape[0]
+    scores = []
+
+    for component in components:
+        ids = component.argsort()[::-1][:top_n]
+        topic_scores = []
+        for i in range(1, len(ids)):
+            wi = ids[i]
+            count_i = binary[:, wi].sum()
+            if count_i == 0:
+                continue
+            for j in range(i):
+                wj = ids[j]
+                count_j = binary[:, wj].sum()
+                both = binary[:, wi].multiply(binary[:, wj]).sum()
+                if both == 0 or count_j == 0:
+                    topic_scores.append(-1.0)
+                    continue
+                p_i = count_i / n_docs
+                p_j = count_j / n_docs
+                p_ij = both / n_docs
+                pmi = np.log(p_ij / (p_i * p_j))
+                topic_scores.append(float(pmi / (-np.log(p_ij))))
+        scores.append(np.mean(topic_scores) if topic_scores else np.nan)
+    return float(np.nanmean(scores)), scores
+
+
+def top_word_set(component, top_n=TOP_N):
+    return set(component.argsort()[::-1][:top_n].tolist())
+
+
+def match_topics(reference_components, candidate_components):
+    """Hungarian alignment using cosine similarity of topic-word weights."""
+    ref = row_normalize(reference_components)
+    cand = row_normalize(candidate_components)
+    similarity = ref @ cand.T
+    ref_ids, cand_ids = linear_sum_assignment(-similarity)
+
+    rows = []
+    for ref_id, cand_id in zip(ref_ids, cand_ids):
+        a = top_word_set(reference_components[ref_id])
+        b = top_word_set(candidate_components[cand_id])
+        jaccard = len(a & b) / max(len(a | b), 1)
+        rows.append({
+            "reference_topic": int(ref_id + 1),
+            "candidate_topic": int(cand_id + 1),
+            "cosine_similarity": float(similarity[ref_id, cand_id]),
+            "topword_jaccard": float(jaccard),
+        })
+    return rows
+
+
+def yearly_topic_means(topic_weights, years):
+    frame = pd.DataFrame(
+        topic_weights,
+        columns=[f"topic_{i}" for i in range(1, topic_weights.shape[1] + 1)],
+    )
+    frame["year"] = np.asarray(years)
+    return frame.groupby("year").mean().sort_index()
+
+
+def add_yearly_correlations(matches, ref_yearly, cand_yearly):
+    common_years = ref_yearly.index.intersection(cand_yearly.index)
+    for row in matches:
+        ref_col = f"topic_{row['reference_topic']}"
+        cand_col = f"topic_{row['candidate_topic']}"
+        if len(common_years) >= 3:
+            rho = spearmanr(
+                ref_yearly.loc[common_years, ref_col],
+                cand_yearly.loc[common_years, cand_col],
+            ).statistic
+            row["yearly_prevalence_spearman"] = float(rho) if np.isfinite(rho) else np.nan
+        else:
+            row["yearly_prevalence_spearman"] = np.nan
+    return matches
+
+
 
