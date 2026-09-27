@@ -49,4 +49,30 @@ STOPWORDS = set("""
 """.split())
 
 
+# Upload the exact official-media and Weibo corpus files separately
+def upload_one_csv(prompt):
+    print("\n" + "=" * 78)
+    print(prompt)
+    print("=" * 78)
+    uploaded = files.upload()
+    csv_names = [name for name in uploaded if name.lower().endswith(".csv")]
+    if len(csv_names) != 1:
+        raise ValueError(
+            f"Upload exactly one CSV in this dialog; found {len(csv_names)}: {csv_names}"
+        )
+    name = csv_names[0]
+    path = Path("/content") / name
+    path.write_bytes(uploaded[name])
+    print(f"Received: {name}")
+    return path
+
+
+OFFICIAL_FILE = upload_one_csv(
+    "Upload the exact official-media CSV used in the original attitude analysis"
+)
+WEIBO_FILE = upload_one_csv(
+    "Upload the exact final cleaned Weibo CSV used in the attitude analysis"
+)
+
+
 
