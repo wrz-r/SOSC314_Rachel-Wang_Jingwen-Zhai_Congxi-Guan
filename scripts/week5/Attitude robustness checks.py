@@ -193,3 +193,58 @@ vocab_embeddings = all_embeddings[len(all_seed_words):]
 del all_embeddings
 
 
+
+# Semantic-axis and document-scoring functions
+def build_axis(pos_words, neg_words):
+    pos = np.vstack([seed_embeddings[word] for word in pos_words])
+    neg = np.vstack([seed_embeddings[word] for word in neg_words])
+    direction = pos.mean(axis=0) - neg.mean(axis=0)
+    direction = direction / (np.linalg.norm(direction) + 1e-12)
+    return direction
+
+
+def calibrated_word_scores(pos_words, neg_words):
+    direction = build_axis(pos_words, neg_words)
+    raw_vocab = vocab_embeddings @ direction
+    retained_seed_vectors = np.vstack(
+        [seed_embeddings[word] for word in pos_words + neg_words]
+    )
+    seed_projection = retained_seed_vectors @ direction
+    mu = seed_projection.mean()
+    sigma = seed_projection.std() + 1e-12
+    return (raw_vocab - mu) / sigma
+
+
+def aggregate_values(values, method):
+    if values.size == 0:
+        return 0.0
+    if method == "mean":
+        return float(values.mean())
+    if method == "median":
+        return float(np.median(values))
+    if method == "trimmed_mean":
+        if values.size < 10:
+            return float(values.mean())
+        ordered = np.sort(values)
+        trim = max(1, int(np.floor(0.10 * values.size)))
+        return float(ordered[trim:-trim].mean())
+    raise ValueError(f"Unknown aggregation method: {method}")
+
+
+def score_documents(pos_words, neg_words, min_freq, aggregation):
+    word_scores = calibrated_word_scores(pos_words, neg_words)
+    allowed = word_frequency >= min_freq
+    scores = np.zeros(len(doc_token_indices), dtype=np.float64)
+    for index, token_ids in enumerate(doc_token_indices):
+        if token_ids.size:
+            kept = token_ids[allowed[token_ids]]
+            if kept.size:
+                scores[index] = aggregate_values(word_scores[kept], aggregation)
+    return scores
+
+
+def safe_spearman(a, b):
+    result = spearmanr(a, b).statistic
+    return float(result) if np.isfinite(result) else np.nan
+
+
