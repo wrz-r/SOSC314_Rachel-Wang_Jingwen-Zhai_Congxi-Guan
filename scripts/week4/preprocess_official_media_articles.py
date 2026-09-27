@@ -22,7 +22,7 @@ from pathlib import Path
 # =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_INPUT = BASE_DIR / "official_media_articles_2021_2025_final_revised.csv"
+DEFAULT_INPUT = BASE_DIR / "official_media_articles_2021_2025_merged.csv"
 DEFAULT_OUTPUT = BASE_DIR / "official_media_articles_2021_2025_preprocessed.csv"
 STOPWORD_DIR = BASE_DIR / "stopwords"
 
