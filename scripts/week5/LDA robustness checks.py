@@ -85,3 +85,38 @@ if RUN_OFFICIAL:
 
 
 
+def load_corpus(path, corpus_name):
+    df = pd.read_csv(path, encoding="utf-8-sig", low_memory=False)
+    required = {"tokens_expanded", "year"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"{corpus_name}: missing columns {sorted(missing)}. "
+            f"Available columns: {df.columns.tolist()}"
+        )
+
+    df = df[df["tokens_expanded"].notna()].copy()
+    df["tokens_expanded"] = df["tokens_expanded"].astype(str).str.strip()
+    df = df[df["tokens_expanded"].str.len() > 0].reset_index(drop=True)
+    df["year"] = df["year"].astype(str).str.replace(r"\.0$", "", regex=True)
+
+    cfg = CORPUS_CONFIGS[corpus_name]
+    vectorizer = CountVectorizer(
+        tokenizer=str.split,
+        token_pattern=None,
+        lowercase=False,
+        min_df=cfg["min_df"],
+        max_df=cfg["max_df"],
+        max_features=cfg["max_features"],
+    )
+    dtm = vectorizer.fit_transform(df["tokens_expanded"])
+    vocabulary = np.asarray(vectorizer.get_feature_names_out())
+
+    print(
+        f"{corpus_name}: {dtm.shape[0]:,} documents/posts x "
+        f"{dtm.shape[1]:,} vocabulary terms"
+    )
+    return df, dtm, vocabulary
+
+
+
