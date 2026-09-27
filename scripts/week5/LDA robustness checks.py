@@ -56,4 +56,32 @@ CORPUS_CONFIGS = {
 }
 
 
+def upload_one_csv(prompt):
+    print("\n" + "=" * 78)
+    print(prompt)
+    print("=" * 78)
+    uploaded = files.upload()
+    csv_names = [name for name in uploaded if name.lower().endswith(".csv")]
+    if len(csv_names) != 1:
+        raise ValueError(
+            f"Upload exactly one CSV in this dialog; found {len(csv_names)}: {csv_names}"
+        )
+    name = csv_names[0]
+    path = Path("/content") / name
+    path.write_bytes(uploaded[name])
+    print(f"Received: {name}")
+    return path
+
+
+INPUT_FILES = {}
+if RUN_WEIBO:
+    INPUT_FILES["weibo"] = upload_one_csv(
+        "Upload weibo_user_posts_2021_2025_preprocessed.csv"
+    )
+if RUN_OFFICIAL:
+    INPUT_FILES["official"] = upload_one_csv(
+        "Upload official_media_articles_2021_2025_preprocessed.csv"
+    )
+
+
 
