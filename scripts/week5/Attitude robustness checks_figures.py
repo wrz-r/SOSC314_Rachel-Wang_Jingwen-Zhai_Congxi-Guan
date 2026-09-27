@@ -99,3 +99,210 @@ plt.show()
 
 
 
+# Transparent PASS/PARTIAL/FAIL assessment table
+def assess_group(frame):
+    minimum_rho = float(frame["spearman_vs_baseline"].min())
+    median_rho = float(frame["spearman_vs_baseline"].median())
+    official_sign_stability = float(frame["official_sign_same_as_baseline"].astype(float).mean())
+    gap_stability = float(frame["gap_sign_same_as_baseline"].astype(float).mean())
+    profile_minimum = float(frame["year_source_profile_spearman"].min())
+    if minimum_rho >= 0.90 and official_sign_stability == 1.0 and profile_minimum >= 0.90:
+        status = "PASS"
+    elif median_rho >= 0.80 and official_sign_stability >= 0.80:
+        status = "PARTIAL"
+    else:
+        status = "FAIL"
+    return (minimum_rho, median_rho, profile_minimum,
+            official_sign_stability, gap_stability, status)
+
+
+assessment_rows = []
+for group, label in [
+    ("anchor_jackknife", "Anchor-pair jackknife"),
+    ("min_frequency", "Vocabulary MIN_FREQ"),
+    ("aggregation", "Document aggregation"),
+]:
+    frame = summary[summary["group"] == group]
+    (minimum_rho, median_rho, profile_minimum,
+     official_sign_stability, gap_stability, status) = assess_group(frame)
+    assessment_rows.append({
+        "check": label,
+        "minimum_score_correlation": minimum_rho,
+        "median_score_correlation": median_rho,
+        "minimum_year_profile_correlation": profile_minimum,
+        "official_sign_stability": official_sign_stability,
+        "gap_sign_stability": gap_stability,
+        "assessment": status,
+        "evidence": (
+            f"min rho={minimum_rho:.2f}; median rho={median_rho:.2f}; "
+            f"min year-profile rho={profile_minimum:.2f}; "
+            f"official sign stable={official_sign_stability:.0%}; "
+            f"gap sign stable={gap_stability:.0%}"
+        ),
+    })
+
+assessment = pd.DataFrame(assessment_rows)
+assessment.to_csv(OUTPUT_DIR / "semantic_scaling_robustness_assessment.csv",
+                  index=False, encoding="utf-8-sig")
+
+# More reliable table: show each robustness metric in a separate column.
+STATUS_COLOR = {
+    "PASS": "#CFE8D5",
+    "PARTIAL": "#F7E3A1",
+    "FAIL": "#F3C2BE"
+}
+
+# Prepare short, single-line cells.
+cell_text = []
+
+for _, row in assessment.iterrows():
+    cell_text.append([
+        row["check"],
+        f"{row['minimum_score_correlation']:.2f}",
+        f"{row['median_score_correlation']:.2f}",
+        f"{row['minimum_year_profile_correlation']:.2f}",
+        f"{row['official_sign_stability']:.0%}",
+        f"{row['gap_sign_stability']:.0%}",
+        row["assessment"]
+    ])
+
+fig, ax = plt.subplots(figsize=(18, 5.2))
+ax.axis("off")
+
+table = ax.table(
+    cellText=cell_text,
+    colLabels=[
+        "Internal-setting check",
+        "Minimum\nscore rho",
+        "Median\nscore rho",
+        "Minimum year-\nprofile rho",
+        "Official-sign\nstability",
+        "Gap-sign\nstability",
+        "Assessment"
+    ],
+    colWidths=[
+        0.23,
+        0.12,
+        0.12,
+        0.15,
+        0.13,
+        0.12,
+        0.13
+    ],
+    cellLoc="center",
+    bbox=[0.01, 0.29, 0.98, 0.48]
+)
+
+table.auto_set_font_size(False)
+table.set_fontsize(10)
+
+# Format header cells.
+for column in range(7):
+    header_cell = table[(0, column)]
+    header_cell.set_facecolor("#315A7D")
+    header_cell.set_text_props(
+        color="white",
+        weight="bold",
+        ha="center",
+        va="center",
+        fontsize=10
+    )
+    header_cell.set_height(0.16)
+
+# Format data rows.
+for row_number, status in enumerate(
+    assessment["assessment"],
+    start=1
+):
+    background = (
+        "#F7F8FA"
+        if row_number % 2
+        else "white"
+    )
+
+    for column in range(7):
+        cell = table[(row_number, column)]
+        cell.set_height(0.13)
+        cell.set_facecolor(background)
+        cell.set_text_props(
+            ha="center",
+            va="center",
+            fontsize=10
+        )
+
+    # Left-align the check name.
+    table[(row_number, 0)].set_text_props(
+        ha="left",
+        va="center",
+        fontsize=10
+    )
+
+    # Color the final assessment cell.
+    table[(row_number, 6)].set_facecolor(
+        STATUS_COLOR[status]
+    )
+    table[(row_number, 6)].set_text_props(
+        weight="bold",
+        ha="center",
+        va="center",
+        fontsize=10.5
+    )
+
+ax.set_title(
+    "Semantic Scaling Robustness Assessment",
+    fontsize=17,
+    fontweight="bold",
+    pad=20
+)
+
+fig.text(
+    0.5,
+    0.105,
+    ("Note: PASS requires minimum document-score and year-profile correlations ≥ .90 and 100% stability in the direction of the official-media mean. PARTIAL requires median score correlation ≥ .80 and official-mean direction stability ≥ 80%. "
+    "The Official–Weibo gap is treated as a secondary result."),
+    ha="center",
+    va="center",
+    fontsize=9.5,
+    color="#555555",
+    wrap=True
+)
+
+fig.text(
+    0.5,
+    0.055,
+    ("These classifications are transparent descriptive thresholds not statistical significance tests."),
+    ha="center",
+    va="center",
+    fontsize=9,
+    color="#777777"
+)
+
+table_png = (
+    OUTPUT_DIR
+    / "semantic_scaling_robustness_assessment.png"
+)
+
+table_pdf = (
+    OUTPUT_DIR
+    / "semantic_scaling_robustness_assessment.pdf"
+)
+
+fig.savefig(
+    table_png,
+    bbox_inches="tight",
+    facecolor="white",
+    dpi=300
+)
+
+fig.savefig(
+    table_pdf,
+    bbox_inches="tight",
+    facecolor="white"
+)
+
+plt.show()
+
+print("\nRobustness assessment")
+print(assessment[["check", "evidence", "assessment"]].to_string(index=False))
+
+
