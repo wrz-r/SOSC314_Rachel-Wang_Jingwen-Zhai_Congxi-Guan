@@ -148,4 +148,131 @@ print(f"Saved visualization: {png_path}")
 print(f"Saved print-quality version: {pdf_path}")
 
 
+# These cutoffs are transparent project-level interpretation rules, not universal statistical significance thresholds.
+def assess_k(mean_alignment, weakest_alignment):
+    if mean_alignment >= 0.75 and weakest_alignment >= 0.65:
+        return "PASS"
+    if mean_alignment >= 0.60 and weakest_alignment >= 0.50:
+        return "PARTIAL"
+    return "FAIL"
+
+
+def assess_seed(mean_cosine, mean_jaccard, mean_weakest_cosine):
+    if mean_cosine >= 0.75 and mean_jaccard >= 0.50 and mean_weakest_cosine >= 0.40:
+        return "PASS"
+    if mean_cosine >= 0.60 and mean_jaccard >= 0.25:
+        return "PARTIAL"
+    return "FAIL"
+
+
+decision_rows = []
+for corpus_name in corpora:
+    folder = OUTPUT_ROOT / corpus_name
+
+    k_raw = pd.read_csv(folder / "check1_k_topic_matches.csv")
+    k_alt = k_raw[k_raw["candidate_k"] != k_raw["reference_k"]].copy()
+    k_by_model = (
+        k_alt.groupby("candidate_k", as_index=False)
+        .agg(mean_alignment=("cosine_similarity", "mean"),
+             mean_jaccard=("topword_jaccard", "mean"))
+    )
+    k_mean = float(k_by_model["mean_alignment"].mean())
+    k_weak = float(k_by_model["mean_alignment"].min())
+    k_jac = float(k_by_model["mean_jaccard"].mean())
+    decision_rows.append({
+        "corpus": corpus_name.title(),
+        "check": "Alternative K",
+        "mean_similarity": k_mean,
+        "weakest_similarity": k_weak,
+        "topword_jaccard": k_jac,
+        "assessment": assess_k(k_mean, k_weak),
+        "evidence": (
+            f"mean alignment={k_mean:.2f}; lowest K={k_weak:.2f}; "
+            f"top-word overlap={k_jac:.2f}"
+        ),
+    })
+
+    seed_raw = pd.read_csv(folder / "check2_seed_stability_summary.csv")
+    seed_alt = seed_raw[seed_raw["candidate_seed"] != REFERENCE_SEED].copy()
+    seed_mean = float(seed_alt["mean_topic_cosine"].mean())
+    seed_weak = float(seed_alt["minimum_topic_cosine"].mean())
+    seed_jac = float(seed_alt["mean_topword_jaccard"].mean())
+    decision_rows.append({
+        "corpus": corpus_name.title(),
+        "check": "Alternative seeds",
+        "mean_similarity": seed_mean,
+        "weakest_similarity": seed_weak,
+        "topword_jaccard": seed_jac,
+        "assessment": assess_seed(seed_mean, seed_jac, seed_weak),
+        "evidence": (
+            f"mean cosine={seed_mean:.2f}; weakest-topic avg={seed_weak:.2f}; "
+            f"top-word overlap={seed_jac:.2f}"
+        ),
+    })
+
+decisions = pd.DataFrame(decision_rows)
+decisions.to_csv(
+    OUTPUT_ROOT / "robustness_assessment_table.csv",
+    index=False,
+    encoding="utf-8-sig",
+)
+
+STATUS_COLOR = {"PASS": "#CFE8D5", "PARTIAL": "#F7E3A1", "FAIL": "#F3C2BE"}
+cell_text = decisions[["corpus", "check", "evidence", "assessment"]].values.tolist()
+
+fig_height = 2.8 + 0.65 * len(cell_text)
+fig, ax = plt.subplots(figsize=(15, fig_height))
+ax.axis("off")
+table = ax.table(
+    cellText=cell_text,
+    colLabels=["Corpus", "Robustness check", "Main evidence", "Assessment"],
+    colWidths=[0.13, 0.18, 0.52, 0.14],
+    cellLoc="left",
+    loc="center",
+)
+table.auto_set_font_size(False)
+table.set_fontsize(10.5)
+table.scale(1, 1.7)
+
+for col in range(4):
+    table[(0, col)].set_facecolor("#315A7D")
+    table[(0, col)].set_text_props(color="white", weight="bold")
+for row_number, status in enumerate(decisions["assessment"], start=1):
+    table[(row_number, 3)].set_facecolor(STATUS_COLOR[status])
+    table[(row_number, 3)].set_text_props(weight="bold", ha="center")
+    for col in range(3):
+        table[(row_number, col)].set_facecolor("#F7F8FA" if row_number % 2 else "white")
+
+ax.set_title(
+    "LDA robustness assessment",
+    fontsize=17,
+    fontweight="bold",
+    pad=18,
+)
+fig.text(
+    0.5,
+    0.03,
+    "Decision rules (declared for interpretation): Alternative K passes when "
+    "mean alignment >= .75 and the weakest alternative K >= .65. Seed stability "
+    "passes when mean cosine >= .75, top-word Jaccard >= .50, and average "
+    "weakest-topic cosine >= .40. PARTIAL indicates moderate but non-uniform "
+    "stability; these are descriptive thresholds, not significance tests.",
+    ha="center",
+    va="bottom",
+    fontsize=9,
+    color="#555555",
+    wrap=True,
+)
+fig.tight_layout(rect=[0.01, 0.10, 0.99, 0.93])
+
+assessment_png = OUTPUT_ROOT / "LDA_robustness_assessment_table.png"
+assessment_pdf = OUTPUT_ROOT / "LDA_robustness_assessment_table.pdf"
+fig.savefig(assessment_png, bbox_inches="tight", facecolor="white")
+fig.savefig(assessment_pdf, bbox_inches="tight", facecolor="white")
+plt.show()
+print("\nRobustness assessment")
+print(decisions[["corpus", "check", "evidence", "assessment"]].to_string(index=False))
+print(f"Saved assessment table: {assessment_png}")
+
+
 
