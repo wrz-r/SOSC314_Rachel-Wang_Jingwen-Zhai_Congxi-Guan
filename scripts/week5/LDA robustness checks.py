@@ -389,4 +389,8 @@ def run_corpus(corpus_name, input_path):
     print(f"[{corpus_name}] results saved to {out_dir}")
 
 
+for corpus_name, input_path in INPUT_FILES.items():
+    run_corpus(corpus_name, input_path)
+
+
 
