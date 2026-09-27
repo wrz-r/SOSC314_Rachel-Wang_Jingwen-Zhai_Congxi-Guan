@@ -322,3 +322,81 @@ for number, specification in enumerate(specifications, start=1):
     )
 
 
+
+
+# Summarize score stability and substantive conclusions
+baseline_scores = scores_by_spec["baseline"]
+baseline_frame = docs[["source", "year"]].copy()
+baseline_frame["score"] = baseline_scores
+baseline_means = baseline_frame.groupby("source")["score"].mean()
+baseline_official_mean = float(baseline_means.get("official", np.nan))
+baseline_weibo_mean = float(baseline_means.get("weibo", np.nan))
+baseline_gap = float(baseline_means.get("official", np.nan) - baseline_means.get("weibo", np.nan))
+baseline_profile = baseline_frame.groupby(["source", "year"])["score"].mean()
+
+summary_rows = []
+yearly_rows = []
+wide_scores = docs[["source", "doc_id", "year"]].copy()
+
+for specification in specifications:
+    spec_id = specification["spec_id"]
+    scores = scores_by_spec[spec_id]
+    wide_scores[spec_id] = scores
+
+    frame = docs[["source", "year"]].copy()
+    frame["score"] = scores
+    means = frame.groupby("source")["score"].mean()
+    gap = float(means.get("official", np.nan) - means.get("weibo", np.nan))
+    profile = frame.groupby(["source", "year"])["score"].mean()
+    common = baseline_profile.index.intersection(profile.index)
+
+    for (source, year), value in profile.items():
+        yearly_rows.append({
+            "spec_id": spec_id,
+            "group": specification["group"],
+            "source": source,
+            "year": year,
+            "mean_score": value,
+        })
+
+    summary_rows.append({
+        "spec_id": spec_id,
+        "group": specification["group"],
+        "removed_positive": specification["removed_positive"],
+        "removed_negative": specification["removed_negative"],
+        "min_freq": specification["min_freq"],
+        "aggregation": specification["aggregation"],
+        "spearman_vs_baseline": safe_spearman(baseline_scores, scores),
+        "mean_absolute_change": float(np.mean(np.abs(scores - baseline_scores))),
+        "year_source_profile_spearman": safe_spearman(
+            baseline_profile.loc[common].values,
+            profile.loc[common].values,
+        ),
+        "official_mean": float(means.get("official", np.nan)),
+        "weibo_mean": float(means.get("weibo", np.nan)),
+        "official_sign_same_as_baseline": bool(
+            np.sign(means.get("official", np.nan)) == np.sign(baseline_official_mean)
+        ) if np.isfinite(means.get("official", np.nan)) and np.isfinite(baseline_official_mean) else np.nan,
+        "official_minus_weibo_gap": gap,
+        "gap_sign_same_as_baseline": bool(
+            np.sign(gap) == np.sign(baseline_gap)
+        ) if np.isfinite(gap) and np.isfinite(baseline_gap) else np.nan,
+        "elapsed_seconds": timings[spec_id],
+    })
+
+summary = pd.DataFrame(summary_rows)
+yearly_summary = pd.DataFrame(yearly_rows)
+
+summary.to_csv(OUTPUT_DIR / "semantic_scaling_specification_summary.csv",
+               index=False, encoding="utf-8-sig")
+yearly_summary.to_csv(OUTPUT_DIR / "semantic_scaling_yearly_profiles.csv",
+                      index=False, encoding="utf-8-sig")
+wide_scores.to_csv(OUTPUT_DIR / "semantic_scaling_document_scores_all_specs.csv",
+                   index=False, encoding="utf-8-sig")
+
+print("\nBaseline official mean:", round(baseline_official_mean, 4))
+print("Baseline Weibo mean:", round(baseline_weibo_mean, 4))
+print("Baseline official minus Weibo gap:", round(baseline_gap, 4))
+display(summary)
+
+
