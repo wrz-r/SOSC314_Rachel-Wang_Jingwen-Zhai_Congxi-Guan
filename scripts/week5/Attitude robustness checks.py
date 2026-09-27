@@ -248,3 +248,77 @@ def safe_spearman(a, b):
     return float(result) if np.isfinite(result) else np.nan
 
 
+
+# Run baseline and all internal-setting specifications
+specifications = [{
+    "spec_id": "baseline",
+    "group": "baseline",
+    "positive_seeds": POS_SEEDS,
+    "negative_seeds": NEG_SEEDS,
+    "min_freq": BASELINE_MIN_FREQ,
+    "aggregation": "mean",
+    "removed_positive": "",
+    "removed_negative": "",
+}]
+
+# Check A: 25 balanced anchor-pair jackknife axes.
+for removed_pos in POS_SEEDS:
+    for removed_neg in NEG_SEEDS:
+        specifications.append({
+            "spec_id": f"drop_{removed_pos}_{removed_neg}",
+            "group": "anchor_jackknife",
+            "positive_seeds": [word for word in POS_SEEDS if word != removed_pos],
+            "negative_seeds": [word for word in NEG_SEEDS if word != removed_neg],
+            "min_freq": BASELINE_MIN_FREQ,
+            "aggregation": "mean",
+            "removed_positive": removed_pos,
+            "removed_negative": removed_neg,
+        })
+
+# Check B: alternative vocabulary-frequency thresholds (3 is the baseline).
+for min_freq in MIN_FREQ_VALUES:
+    if min_freq != BASELINE_MIN_FREQ:
+        specifications.append({
+            "spec_id": f"min_freq_{min_freq}",
+            "group": "min_frequency",
+            "positive_seeds": POS_SEEDS,
+            "negative_seeds": NEG_SEEDS,
+            "min_freq": min_freq,
+            "aggregation": "mean",
+            "removed_positive": "",
+            "removed_negative": "",
+        })
+
+# Check C: alternative document-level aggregation rules.
+for aggregation in AGGREGATION_VALUES:
+    if aggregation != "mean":
+        specifications.append({
+            "spec_id": aggregation,
+            "group": "aggregation",
+            "positive_seeds": POS_SEEDS,
+            "negative_seeds": NEG_SEEDS,
+            "min_freq": BASELINE_MIN_FREQ,
+            "aggregation": aggregation,
+            "removed_positive": "",
+            "removed_negative": "",
+        })
+
+print(f"Running {len(specifications)} specifications...")
+scores_by_spec = {}
+timings = {}
+for number, specification in enumerate(specifications, start=1):
+    start = time.time()
+    scores = score_documents(
+        specification["positive_seeds"],
+        specification["negative_seeds"],
+        specification["min_freq"],
+        specification["aggregation"],
+    )
+    scores_by_spec[specification["spec_id"]] = scores
+    timings[specification["spec_id"]] = time.time() - start
+    print(
+        f"[{number:02d}/{len(specifications)}] {specification['spec_id']} "
+        f"({timings[specification['spec_id']]:.1f}s)"
+    )
+
+
