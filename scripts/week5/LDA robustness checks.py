@@ -210,4 +210,183 @@ def add_yearly_correlations(matches, ref_yearly, cand_yearly):
     return matches
 
 
+def make_model(corpus_name, k, seed):
+    cfg = CORPUS_CONFIGS[corpus_name]
+    kwargs = dict(
+        n_components=k,
+        random_state=seed,
+        learning_method=cfg["learning_method"],
+        max_iter=cfg["max_iter"],
+        evaluate_every=-1,
+        n_jobs=-1,
+    )
+    if cfg["learning_method"] == "online":
+        kwargs["batch_size"] = cfg["batch_size"]
+    return LatentDirichletAllocation(**kwargs)
+
+
+def fit_run(corpus_name, df, dtm, vocabulary, k, seed, out_dir):
+    print(f"[{corpus_name}] fitting K={k}, seed={seed} ...", flush=True)
+    start = time.time()
+    model = make_model(corpus_name, k, seed)
+    weights = model.fit_transform(dtm)
+    elapsed = time.time() - start
+
+    coherence_mean, coherence_by_topic = npmi_coherence(dtm, model.components_)
+    diversity = topic_diversity(model.components_)
+    perplexity = float(model.perplexity(dtm))  # descriptive in-sample metric
+
+    run_id = f"k{k}_seed{seed}"
+    topic_rows = []
+    for i, component in enumerate(model.components_, start=1):
+        ids = component.argsort()[::-1][:TOP_N]
+        topic_rows.append({
+            "corpus": corpus_name,
+            "run_id": run_id,
+            "k": k,
+            "seed": seed,
+            "topic": i,
+            "top_words": " ".join(vocabulary[ids]),
+            "npmi_coherence": coherence_by_topic[i - 1],
+        })
+
+    pd.DataFrame(topic_rows).to_csv(
+        out_dir / f"topics_{run_id}.csv", index=False, encoding="utf-8-sig"
+    )
+    yearly = yearly_topic_means(weights, df["year"].values)
+    yearly.to_csv(out_dir / f"topic_by_year_{run_id}.csv", encoding="utf-8-sig")
+
+    metric = {
+        "corpus": corpus_name,
+        "run_id": run_id,
+        "k": k,
+        "seed": seed,
+        "n_documents": dtm.shape[0],
+        "n_vocabulary": dtm.shape[1],
+        "learning_method": CORPUS_CONFIGS[corpus_name]["learning_method"],
+        "max_iter": CORPUS_CONFIGS[corpus_name]["max_iter"],
+        "in_sample_perplexity": perplexity,
+        "mean_npmi_coherence": coherence_mean,
+        "topic_diversity": diversity,
+        "elapsed_seconds": elapsed,
+    }
+    print(
+        f"  done: NPMI={coherence_mean:.3f}, diversity={diversity:.3f}, "
+        f"perplexity={perplexity:.1f}, time={elapsed/60:.1f} min"
+    )
+    return {
+        "model": model,
+        "weights": weights,
+        "yearly": yearly,
+        "metric": metric,
+    }
+
+
+def run_corpus(corpus_name, input_path):
+    cfg = CORPUS_CONFIGS[corpus_name]
+    baseline_k = cfg["baseline_k"]
+    out_dir = OUTPUT_ROOT / corpus_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    df, dtm, vocabulary = load_corpus(input_path, corpus_name)
+
+    # Avoid fitting the shared baseline run twice.
+    run_pairs = {(k, REFERENCE_SEED) for k in K_VALUES}
+    run_pairs |= {(baseline_k, seed) for seed in SEED_VALUES}
+    run_pairs = sorted(run_pairs)
+
+    fitted = {}
+    for k, seed in run_pairs:
+        fitted[(k, seed)] = fit_run(
+            corpus_name, df, dtm, vocabulary, k, seed, out_dir
+        )
+
+    metrics = pd.DataFrame([fitted[key]["metric"] for key in run_pairs])
+    metrics.to_csv(out_dir / "model_metrics.csv", index=False, encoding="utf-8-sig")
+
+    reference = fitted[(baseline_k, REFERENCE_SEED)]
+
+    # Check 1: match each alternative K to the baseline-K topics.
+    k_matches = []
+    for k in K_VALUES:
+        candidate = fitted[(k, REFERENCE_SEED)]
+        matches = match_topics(
+            reference["model"].components_, candidate["model"].components_
+        )
+        matches = add_yearly_correlations(
+            matches, reference["yearly"], candidate["yearly"]
+        )
+        for row in matches:
+            row.update({
+                "corpus": corpus_name,
+                "check": "alternative_k",
+                "reference_k": baseline_k,
+                "candidate_k": k,
+                "reference_seed": REFERENCE_SEED,
+                "candidate_seed": REFERENCE_SEED,
+            })
+            k_matches.append(row)
+    pd.DataFrame(k_matches).to_csv(
+        out_dir / "check1_k_topic_matches.csv", index=False, encoding="utf-8-sig"
+    )
+
+    # Check 2: match alternative seeds to seed 42 at the baseline K.
+    seed_matches = []
+    for seed in SEED_VALUES:
+        candidate = fitted[(baseline_k, seed)]
+        matches = match_topics(
+            reference["model"].components_, candidate["model"].components_
+        )
+        matches = add_yearly_correlations(
+            matches, reference["yearly"], candidate["yearly"]
+        )
+        for row in matches:
+            row.update({
+                "corpus": corpus_name,
+                "check": "alternative_seed",
+                "reference_k": baseline_k,
+                "candidate_k": baseline_k,
+                "reference_seed": REFERENCE_SEED,
+                "candidate_seed": seed,
+            })
+            seed_matches.append(row)
+    seed_matches_df = pd.DataFrame(seed_matches)
+    seed_matches_df.to_csv(
+        out_dir / "check2_seed_topic_matches.csv", index=False, encoding="utf-8-sig"
+    )
+
+    seed_summary = (
+        seed_matches_df.groupby("candidate_seed", as_index=False)
+        .agg(
+            mean_topic_cosine=("cosine_similarity", "mean"),
+            minimum_topic_cosine=("cosine_similarity", "min"),
+            mean_topword_jaccard=("topword_jaccard", "mean"),
+            mean_yearly_spearman=("yearly_prevalence_spearman", "mean"),
+        )
+    )
+    seed_summary.to_csv(
+        out_dir / "check2_seed_stability_summary.csv",
+        index=False,
+        encoding="utf-8-sig",
+    )
+
+    with (out_dir / "run_settings.json").open("w", encoding="utf-8") as file:
+        json.dump(
+            {
+                "corpus": corpus_name,
+                "input_file": input_path.name,
+                "k_values": K_VALUES,
+                "baseline_k": baseline_k,
+                "seed_values": SEED_VALUES,
+                "reference_seed": REFERENCE_SEED,
+                **cfg,
+            },
+            file,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    print(f"[{corpus_name}] results saved to {out_dir}")
+
+
 
