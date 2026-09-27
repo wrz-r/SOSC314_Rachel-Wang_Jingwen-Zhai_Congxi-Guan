@@ -156,3 +156,40 @@ print(f"Combined tokenized corpus: {len(docs):,} documents/posts")
 
 
 
+# Embed the shared vocabulary and semantic anchors once
+counter = Counter()
+for tokens in docs["tokens"]:
+    counter.update(tokens)
+
+vocabulary = sorted([word for word, count in counter.items() if count >= min(MIN_FREQ_VALUES)])
+word_to_index = {word: index for index, word in enumerate(vocabulary)}
+word_frequency = np.asarray([counter[word] for word in vocabulary])
+
+# Preserve repeated tokens, matching the original mean-of-token-scores approach.
+doc_token_indices = [
+    np.asarray([word_to_index[token] for token in tokens if token in word_to_index], dtype=np.int32)
+    for tokens in docs["tokens"]
+]
+
+print(f"Shared vocabulary at MIN_FREQ >= {min(MIN_FREQ_VALUES)}: {len(vocabulary):,} words")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Loading embedding model on {device}: {EMBED_MODEL}")
+embedding_model = SentenceTransformer(EMBED_MODEL, device=device)
+
+all_seed_words = POS_SEEDS + NEG_SEEDS
+texts_to_embed = all_seed_words + vocabulary
+all_embeddings = embedding_model.encode(
+    texts_to_embed,
+    batch_size=EMBED_BATCH_SIZE,
+    show_progress_bar=True,
+    normalize_embeddings=True,
+    convert_to_numpy=True,
+)
+seed_embeddings = {
+    word: all_embeddings[index]
+    for index, word in enumerate(all_seed_words)
+}
+vocab_embeddings = all_embeddings[len(all_seed_words):]
+del all_embeddings
+
+
