@@ -75,4 +75,84 @@ WEIBO_FILE = upload_one_csv(
 )
 
 
+# Load, standardize, and tokenize both corpora
+def read_csv_flexible(path):
+    last_error = None
+    for encoding in ("utf-8-sig", "utf-8", "gb18030"):
+        try:
+            return pd.read_csv(path, encoding=encoding, low_memory=False)
+        except UnicodeDecodeError as error:
+            last_error = error
+    raise last_error
+
+
+def find_column(df, candidates, description):
+    for column in candidates:
+        if column in df.columns:
+            return column
+    raise KeyError(
+        f"Could not find {description}. Tried {candidates}. "
+        f"Available columns: {df.columns.tolist()}"
+    )
+
+
+def extract_year(value, fallback=""):
+    match = re.search(r"20\d{2}", str(value))
+    if match:
+        return match.group()
+    match = re.search(r"20\d{2}", str(fallback))
+    return match.group() if match else ""
+
+
+def tokenize(text):
+    if not text:
+        return []
+    tokens = [token.strip() for token in jieba.cut(str(text))]
+    return [
+        token for token in tokens
+        if token
+        and token not in STOPWORDS
+        and not re.fullmatch(r"[\W_]+", token)
+        and len(token) >= 2
+    ]
+
+
+def standardize_corpus(path, source):
+    df = read_csv_flexible(path)
+    if source == "official":
+        text_col = find_column(df, ["text", "clean_text", "正文", "文章正文"], "official text column")
+        date_col = find_column(df, ["date", "发布时间", "publication_date"], "official date column")
+        id_col = next((c for c in ["url", "id", "doc_idx"] if c in df.columns), None)
+        fallback_year_col = "year" if "year" in df.columns else None
+    else:
+        text_col = find_column(df, ["微博正文", "clean_text", "text"], "Weibo text column")
+        date_col = find_column(df, ["发布时间", "date"], "Weibo date column")
+        id_col = next((c for c in ["id", "url", "doc_idx"] if c in df.columns), None)
+        fallback_year_col = next((c for c in ["sampling_year", "year"] if c in df.columns), None)
+
+    # Preserve the uploaded file's row index before assigning scalar metadata.
+    out = pd.DataFrame(index=df.index)
+    out["source"] = source
+    out["doc_id"] = (
+        df[id_col].fillna("").astype(str)
+        if id_col else pd.Series([f"{source}_{i}" for i in range(len(df))])
+    )
+    out["text"] = df[text_col].fillna("").astype(str).str.strip()
+    fallback = df[fallback_year_col] if fallback_year_col else pd.Series([""] * len(df))
+    out["year"] = [extract_year(date, fb) for date, fb in zip(df[date_col], fallback)]
+    out = out[out["text"].str.len() > 0].reset_index(drop=True)
+    print(f"{source}: loaded {len(out):,} non-empty documents")
+    return out
+
+
+official = standardize_corpus(OFFICIAL_FILE, "official")
+weibo = standardize_corpus(WEIBO_FILE, "weibo")
+docs = pd.concat([official, weibo], ignore_index=True)
+
+print("Tokenizing both corpora...")
+docs["tokens"] = docs["text"].map(tokenize)
+docs = docs[docs["tokens"].map(len) > 0].reset_index(drop=True)
+print(f"Combined tokenized corpus: {len(docs):,} documents/posts")
+
+
 
