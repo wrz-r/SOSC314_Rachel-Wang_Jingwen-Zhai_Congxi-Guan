@@ -4,8 +4,6 @@
 
 **GitHub Pages report:** Link to be added.
 
-**[Read the report in Colab](https://colab.research.google.com/drive/1FiEUvvVwBbwuYdd1gTovuYx2q4KIjuTR)**
-
 ## Research Question
 
 How do Chinese official media frame marriage, and how do their topics and attitudes differ from user-initiated Weibo discussions during **2021–2025**?
