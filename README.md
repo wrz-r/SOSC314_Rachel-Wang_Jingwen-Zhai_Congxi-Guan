@@ -2,7 +2,7 @@
 
 **SOSC 314 · Ruizhe (Rachel) Wang, Jingwen Zhai, and Congxi Guan**
 
-**GitHub Pages report:** GitHub Pages report:** [View the final report](https://jingwenzhai121.github.io/sosc314-project-website/)
+**GitHub Pages report:** GitHub Pages report: [View the final report](https://jingwenzhai121.github.io/sosc314-project-website/)
 
 ## Research Question
 
