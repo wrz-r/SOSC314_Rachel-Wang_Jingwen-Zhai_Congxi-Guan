@@ -5,7 +5,7 @@
 
 ## Research Question
 
-**How do Chinese official media frame marriage-related issues, and how does this framing differ from the topics and sentiment expressed in user-initiated online discussions?**
+**How do Chinese official media frame marriage, and how do their topics and attitudes differ from user-initiated Weibo discussions?**
 
 ## Project Purpose and Background
 
@@ -32,30 +32,12 @@ The official-media corpus contains full-text articles from three major Chinese o
 
 Articles are identified through keyword-based searches of the selected media websites. After candidate articles are identified, the full text is collected from the original news webpages.
 
-For each article, the dataset retains:
-
-- `media`: media outlet
-- `date`: publication date
-- `title`: article title
-- `text`: full article text
-- `url`: original article URL
-- `matched_keywords`: keywords matched during data collection
-- `relevance_label`: initial relevance-screening result
-
 ### User-Initiated Weibo Corpus
 
 The second corpus contains original public Weibo posts independently initiated by users.
 
 We collect these posts using the open-source [dataabc/weibo-search](https://github.com/dataabc/weibo-search) scraper together with project-specific Python scripts. Searches are divided by keyword and time period to improve coverage and make the collection process reproducible.
 
-For each Weibo post, the dataset retains available variables such as:
-
-- post ID
-- user ID
-- post text
-- publication date and time
-- search keyword
-- available engagement indicators
 
 ### Time Period and Keywords
 
@@ -67,33 +49,23 @@ The keyword list includes direct marriage terms and related relationship issues:
 - **Marriage status and attitudes:** `单身`, `不婚`, `晚婚`, `恐婚`, `催婚`
 - **Marriage-related social issues:** `彩礼`, `高价彩礼`, `离婚`, `离婚冷静期`
 
-### Unit of Analysis
+**Official media**  
+**5,265** full-text articles  
+People.cn, CCTV, and China News Service  
+Unit: one article
 
-The project uses two document-level units of analysis:
+**Weibo**  
+**41,568** cleaned, relevant, deduplicated posts  
+Original public posts collected with [dataabc/weibo-search](https://github.com/dataabc/weibo-search)  
+Unit: one post
 
-- **Official-media corpus:** one full official-media article
-- **User-initiated corpus:** one original Weibo post
+| Dimension | Official media | Weibo |
+| --- | --- | --- |
+| **Provenance** | Official search results and article pages | Public search results from a pinned scraper version |
+| **Core fields** | Source, date, title, text, URL, matched keywords | Time block, query keyword, post text, publication time |
+| **Screening** | Matched terms and relevance class | Relevance level, rule, and matched evidence |
+| **Model inputs** | Year, cleaned text, tokens, and token counts | |
 
-### Inclusion and Exclusion Criteria
-
-A document is included when it:
-
-- was publicly available on the selected media website or Weibo;
-- was published within the observation period;
-- contains at least one predefined marriage-related keyword;
-- substantively discusses marriage or a closely related issue;
-- contains sufficient usable text for analysis;
-- belongs to one of the two defined corpora.
-
-The project excludes:
-
-- duplicate documents;
-- advertisements and commercial marketing;
-- spam or obvious automated content;
-- empty or inaccessible documents;
-- keyword matches unrelated to marriage;
-- documents containing only incidental marriage references;
-- records without sufficient text for analysis.
 
 ### Cleaning, Relevance, and Preprocessing
 
@@ -104,6 +76,7 @@ The project excludes:
 | **Relevance** | Require valid marriage terms; screen ambiguous uses. | Accept strong terms; require context, first-person attitude, or multiple terms for weak matches. |
 | **Duplicates** | Remove duplicate URLs, titles, and text. | For identical ordered Chinese-character sequences, retain the earliest post. |
 | **NLP** | Tokenize with `jieba`; combine public and project stopwords; protect marriage terms; require ≥10 article tokens or ≥5 post tokens. | 
+
 
 ## Research Method
 
