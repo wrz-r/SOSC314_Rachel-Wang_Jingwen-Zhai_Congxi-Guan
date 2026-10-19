@@ -187,6 +187,188 @@ The topic distributions show **two different ways of discussing marriage**. Offi
 
 
 
+#### Shared Issues: Bride Price and Divorce
+
+Interestingly, **bride price and divorce** appeared as topics in both corpora. This indicates that they are recurring concerns in both official media and Weibo discussions. To understand how the two sources approach the same issue, we compared the **weights of selected words within the corresponding LDA topics**.
+
+**Bride price** (money or gifts traditionally given by the groom's family to the bride's family as part of marriage arrangements) appeared in both corpora. In the official-media topic, *return* had a weight of **3.34%**, compared with less than **0.01%** in the Weibo topic. Together with words about payment and courts, this suggests an emphasis on disputes about bride-price payments and how they are resolved. In the Weibo topic, *men* (**6.07%**) and *women* (**4.60%**) were more prominent, compared with less than **0.01%** for each word in the selected official-media topic. These terms suggest more attention to the expectations placed on men and women when preparing for marriage. In short, official-media vocabulary points more toward **handling disputes**, while Weibo vocabulary points more toward **gender relations and marriage expectations**.
+
+*Figure 4. Selected keyword weights in the official-media and Weibo bride-price topics.*
+
+**Divorce.** The official-media divorce topic gave more weight to *court* (**1.96%**, compared with **0.58%** on Weibo) and *judgment* (**0.87%**, compared with **0.16%**). This suggests greater attention to legal cases and decisions made by courts. The Weibo topic emphasized the *divorce cooling-off period* (a waiting period before a couple can complete a divorce by mutual agreement through registration): its weight was **5.05%**, compared with **0.22%** in official media. *Domestic violence* was also more prominent in the Weibo topic (**1.62%**, compared with less than **0.01%**). These terms suggest that Weibo discussions give more attention to the difficulties people may face during divorce and to safety within marriage.
+
+*Figure 5. Selected keyword weights in the official-media and Weibo divorce topics.*
+
+#### Topic Trends, 2021–2025
+
+The clearest change in official media was a shift **from discussing young people's marriage choices toward reforms of wedding customs**. Among the topics shown in Figure 5:
+
+- **Marriage choices** decreased from **18.3% (2021)** to **4.2% (2025)**.
+- **Wedding reform** increased from **7.9%** to **19.4%**.
+- **Rural bride-price reform** increased from **4.8%** to **10.0%**, with a peak of **12.4% in 2024**.
+- **Fertility policy** declined from **8.7%** to **2.8%**.
+
+These changes may be connected to broader developments in China. Marriage registration numbers have declined over the longer term, while the **cost of marriage**, especially high bride prices, has attracted public and policy attention. Government initiatives to discourage expensive wedding customs and address bride-price disputes also became more prominent during this period. For example, marriage-registration and wedding-custom reforms continued in 2025. This context may help explain the growing attention to wedding and bride-price reform in official media.
+
+*Figure 6. Selected official-media topic trends, 2021–2025.*
+
+Weibo discussions showed a different pattern. The shares of major topics changed relatively little between 2021 and 2025.
+
+Taken together, the trends suggest that **official-media priorities changed more noticeably, while the main concerns expressed on Weibo were relatively consistent**. A possible explanation is that official media increasingly discussed marriage in connection with social and policy efforts to reduce the costs and change the customs of marriage, while Weibo users continued to talk about how marriage affects their everyday lives.
+
+*Figure 7. Trends in Weibo topic prevalence, 2021–2025.*
+
+### LDA Topic Model Diagnostics and Robustness
+
+To check how reliable the **LDA topic results** were, we examined topic coherence and exclusivity, random-seed stability, and sensitivity to the number of topics (K).
+
+| Diagnostic | Purpose | Main observation |
+| --- | --- | --- |
+| **Coherence and exclusivity** | Check whether the top words form meaningful, distinctive topics. | Several topics are clear, but some broad themes have weaker distinctiveness. |
+| **Random-seed stability** | Compare topic solutions from different initializations with the main model (seed 42). | Official-media topic similarity ranged from **0.74 to 0.82**; Weibo ranged from **0.62 to 0.75** across the displayed seeds. |
+| **Sensitivity to K** | Check whether topics persist when K changes. | Major themes are recognizable across settings, although some topics split or merge. |
+
+#### Coherence and Exclusivity
+
+*Figure 8. Topic coherence and exclusivity for the K = 12 models.*
+
+#### Random-Seed Stability
+
+Topic similarity was generally higher for the official-media models than for the Weibo models, suggesting that the Weibo topic solution is more sensitive to initialization.
+
+*Figure 9. Random-seed stability relative to seed 42 at K = 12.*
+
+#### Sensitivity to the Number of Topics
+
+We also compared LDA results using different numbers of topics. The broader themes were still recognizable, but some specific topics were split into smaller ones or combined with other topics as K changed. We chose **K = 12** because it provided a useful balance of clear topics and manageable detail.
+
+#### Topic-Alignment Diagnostic
+
+To compare alternative K values with the K = 12 baseline, Hungarian matching ([Munkres, 1957](https://doi.org/10.1137/0105003)) pairs topics by maximum cosine similarity of their word-weight vectors. Cosine similarity, top-word Jaccard overlap, and yearly-prevalence Spearman correlation then measure content and trend stability without confusing topic-label switching with model change. Figure 10 reports this comparison.
+
+*Figure 10. Topic similarity when the number of topics K is changed.*
+
+**Interpretation.** Broad themes remain recognizable when *K* changes, but narrower topics can split or merge, especially on Weibo. Conclusions therefore emphasize aggregate differences rather than one-to-one replication of every topic.
+
+### Interpretation and Substantive Takeaways
+
+The main finding is that **official media and Weibo users place different priorities on marriage-related issues**. Official-media articles devote more attention to marriage registration, legal processes, and reforms of wedding customs. Weibo users more often discuss family responsibilities, relationships, pressure from others, and the personal decision to marry. This difference matters because it shows which aspects of marriage become visible in official-media articles and which concerns are more prominent in everyday online conversations.
+
+The comparisons of **bride price and divorce** add a further insight. Even when both sources discuss the same issue, they may describe the problem differently. For example, discussions focused on courts or the return of bride-price payments points toward **legal rules and institutional solutions**. Discussions focused on gender expectations, divorce waiting periods, or domestic violence raise questions about **fairness, personal choices, and lived experiences**.
+
+The trends also suggest that the relationship between these discussions is **not fixed over time**. Official-media attention shifted toward wedding and bride-price reform, while the main themes on Weibo changed relatively little. Together, these results point to a **possible gap between institutional priorities and concerns expressed in everyday discussion**. Understanding that gap can help researchers ask whether public communication addresses the aspects of marriage that people find most relevant. Our analysis identifies the difference in emphasis; it cannot determine whether official media is responding to, or overlooking, specific public concerns.
+
+### Limitations and Future Work
+
+- **Corpus differences:** Official articles and short social-media posts differ in length and writing style, which can affect word and topic distributions.
+- **Topic uncertainty:** Some topics are broad or overlapping, especially on Weibo. Topic labels involve researcher judgment, and the results vary somewhat with random seeds and K.
+- **Future work:** Reading representative posts and articles, or comparing discussions around specific events, could help test how shared issues are framed and whether official media responds to public concerns.
+
+---
+
+## Methods-Attitude Analysis
+
+Topic modeling tells us what official media and users are talking about, but it does not tell us whether marriage is being represented positively, negatively, or neutrally. We therefore introduce attitude analysis to help us evaluate the sentiment towards marriage.
+
+We compare **Semantic Scaling** with a supervised **Transformer classifier**.
+
+### Semantic Scaling
+
+The model embeds documents and two sets of anchor words using the Chinese model `BAAI/bge-small-zh-v1.5` ([Xiao et al., 2023](https://arxiv.org/abs/2309.07597)).
+
+- **Positive anchors:** 幸福、美好、和谐、陪伴、稳定 *(happiness, harmony, companionship, stability)*
+- **negative anchors:** 压力、负担、痛苦、束缚、恐惧 *(pressure, burden, pain, confinement, fear)*
+
+Each document receives a continuous score based on its relative proximity to the two semantic poles and calculate *ScoreS*
+
+  
+
+### Transformer-Based Attitude Classification
+
+After developing the attitude codebook through human annotation of 100 posts, we trained a supervised Transformer-based classifier. The purpose of the model is to learn the relationship between the linguistic context of a document and its human-coded attitude, rather than relying on the presence or frequency of individual keywords.
+
+We used `hfl/chinese-roberta-wwm-ext` ([Cui et al., 2020](https://doi.org/10.18653/v1/2020.findings-emnlp.58)), a Chinese RoBERTa model with the three attitude categories defined in our codebook: negative (-1), neutral (0), and positive (+1).
+
+We calculate:
+
+_ScoreT = P(+1) − P(−1)_
+
+  
+
+We prioritize the **Transformer** because its categories correspond directly to the human annotation scheme and can be evaluated within the context.
+It also achieved **82.6% validation accuracy**. Across 3,935 documents, its scores had moderate positive correlations with Semantic Scaling (Pearson *r* = 0.382; Spearman *ρ* = 0.370). On the manually annotated subset, the correlations were *r* = 0.472 and *ρ* = 0.504.
+
+*Figure 11. Distributions of Transformer and Semantic Scaling attitude scores.*
+
+### Evaluation and results
+
+The results show a clear difference in marriage attitudes between official media and user-initiated posts. Overall, official media posts are more positive toward marriage than user posts.
+
+| Result | Official media | User-initiated posts |
+| --- | --- | --- |
+| Mean Transformer score | +0.31 | -0.03 |
+| Predicted positive | 56% | 20% |
+| Predicted neutral | 42% | 27% |
+| Predicted negative | approximately 2% | 54% |
+
+*Figure 12. Distribution of marriage attitudes in official-media and user-initiated posts.*
+
+From 2021 to 2025, official-media scores fluctuate, rising from about +0.26 in 2021 to +0.39 in 2025, with a decline in 2024. User scores remain close to or below zero. The estimated official-user gap is positive in every year and largest in 2025.
+
+*Figure 13. Attitude trends over five years.*
+
+The categorical results further suggest that this difference is driven primarily by the relative absence of negative attitudes in official media rather than by a much larger share of positive attitudes. Positive texts account for 56% of official-media posts while 54% of user posts are classified as negative.
+
+*Figure 14. Attitude composition of official-media and user-initiated posts.*
+
+Overall, these results indicate a persistent divergence between institutional and user-initiated marriage discourse. **Official media tend to frame marriage more positively and show greater variation across time, whereas user attitudes remain relatively stable and mildly positive.** The divergence becomes particularly pronounced in 2025.
+
+### Diagnostics and robustness
+
+#### Sensitivity Analysis
+
+A sensitivity analysis compared **five preprocessing specifications**: baseline cleaning, raw text, retaining hashtags, and maximum sequence lengths of 128 and 256 tokens. The consistency of the results indicates that the substantive finding is robust to reasonable preprocessing choices, rather than being an artifact of a particular text-cleaning or truncation procedure.
+
+*Figure 15. Sensitivity of the Official–Weibo attitude gap across specifications.*
+
+#### Seed Stability
+
+Two better-performing random-seed runs, with validation macro-F1 scores of 0.725 and 0.692, produced positive gaps, while three weaker runs produced negative or near-zero gaps. This indicates that model performance is sensitive to random initialization given the small labelled sample, and that the substantive gap is conditional on adequate model performance.
+
+*Figure 16. Attitude-model stability across random seeds.*
+
+A manual audit of 40 Weibo posts found 90% human-model agreement among high-confidence cases and 50% among low-confidence cases. The model misclassified 11 of 12 human-labelled negative posts as neutral or positive. This suggests that it under-detects negative attitudes, especially in ironic or self-deprecating expressions.
+
+*Figure 17. Human–model agreement in the Weibo audit sample.*
+
+#### Semantic Scaling Robustness
+
+Holding BAAI/bge-small-zh-v1.5 fixed ([Xiao et al., 2023](https://arxiv.org/abs/2309.07597)), we vary: (1) one positive–negative anchor pair at a time ([Efron & Tibshirani, 1993](https://doi.org/10.1007/978-1-4899-4541-9)), (2) MIN\_FREQ = 2, 3, or 5, and (3) mean, median, or trimmed-mean aggregation. Alternatives are compared with the baseline using document-score and yearly-profile Spearman correlations plus the signs of the official-media mean and Official–Weibo gap.
+
+*Figure 18. Semantic Scaling robustness across internal settings.*
+
+Document scores are mostly stable: the anchor-pair jackknife median is 0.954, MIN\_FREQ alternatives exceed 0.99, and the trimmed mean reaches 0.976. Median aggregation is weaker (0.827). Both corpus means remain positive, although magnitudes and annual profiles vary.
+
+*Figure 19. Semantic Scaling robustness assessment using predefined descriptive thresholds.*
+
+Vocabulary frequency passes with correlations near 0.99. Anchor-pair omission is partial because the minimum yearly-profile correlation is −0.36 and gap-sign stability is 68%; aggregation is also partial. The overall positive direction is robust, but yearly patterns and the exact gap require caution. Thresholds are descriptive, not significance tests.
+
+### Interpretation and limitations
+
+The results suggest that official media portray marriage more positively than user-initiated posts, with a difference that persists throughout 2021–2025.
+
+Measurement remains the main limitation. The **initial labelled sample is small, negative Weibo posts are difficult to classify** due to the language. The result shown before is the re-trained model after the 40-post-manual audit, but bias still exists.
+
+Next steps should expand the labelled dataset, include more negative examples, and report cross-validation plus class-specific precision, recall, and macro-F1. A larger manual audit stratified by source and predicted category would help locate systematic errors.
+
+#### Additional Takeaway
+
+The strongest conclusion is aggregate: official media emphasize institutional and policy concerns and portray marriage more positively, while Weibo foregrounds personal pressure and lived experience. The results do not show causal media effects or population attitudes.
+
+#### Additional Limitation and Next Step
+
+Individual topics, annual attitude profiles, and the exact cross-corpus gap are less stable than the overall direction. Future work should expand stratified human labels—especially ironic, implicit, and negative posts—and add event-matched qualitative validation.
+
 
 ## Repository Structure
 
