@@ -1,0 +1,25 @@
+# Analysis and notebook environment; not an exact lock of the original runs.
+numpy
+pandas
+scipy
+scikit-learn
+gensim
+jieba==0.42.1
+matplotlib
+seaborn
+notebook
+ipython
+nbconvert
+
+# Attitude models
+torch
+transformers
+sentence-transformers
+
+# Collection and interactive charts
+requests
+beautifulsoup4
+regex
+Scrapy==2.12.0
+Twisted==24.11.0
+pyecharts
