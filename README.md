@@ -42,52 +42,101 @@ The model-ready datasets contain **2,020 official-media articles and 21,945 Weib
 
 These findings describe the collected texts; they do not establish causal media effects or represent the attitudes of the entire population.
 
-## Reproduce the Analysis
-
-The repository groups data in `data/`, saved figures in `figure/`, and code in:
+## Repository Structure
 
 ```text
-scripts/
-├── web_scraping/
-├── data_cleaning/
-├── topic_modeling/       # includes Fightin’ Words
-├── attitude_analysis/
-├── diagnostics/
-└── visualization/
+.
+├── data/                      # Cleaned and preprocessed datasets
+├── figure/                    # Saved project figures
+├── scripts/
+│   ├── web_scraping/           # Official-media and Weibo collection
+│   ├── data_cleaning/          # Cleaning and text preprocessing
+│   ├── topic_modeling/         # Fightin’ Words and LDA notebooks
+│   ├── attitude_analysis/      # Classifier training and semantic scaling
+│   ├── diagnostics/            # Model diagnostics and robustness checks
+│   └── visualization/          # Plotting code
+└── requirements.txt
 ```
 
-### Environment
+## Reproducibility
 
-Use Python 3.11 in a virtual environment, or Google Colab. A GPU is useful for Transformer training.
+### Prerequisites
+
+- Python 3.11 and Git.
+- Google Colab can be used for the Colab-based workflows.
+- A GPU is recommended for Transformer training.
+
+### 1. Clone and Install
 
 ```bash
 git clone https://github.com/wrz-r/SOSC314_Rachel-Wang_Jingwen-Zhai_Congxi-Guan.git
 cd SOSC314_Rachel-Wang_Jingwen-Zhai_Congxi-Guan
 python -m venv .venv
+```
+
+Activate the environment:
+
+```bash
+# macOS / Linux
 source .venv/bin/activate
+```
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
 python -m pip install -r requirements.txt
+```
+
+### 2. Prepare the Data
+
+The collected and cleaned datasets are included. To start with the model-ready data, run the following from the repository root. This places the inputs where the existing notebooks expect them and creates the directory used by their project-root check.
+
+```python
+from pathlib import Path
+from shutil import copy2
+from zipfile import ZipFile
+
+root = Path.cwd()
+(root / "notebook").mkdir(exist_ok=True)
+data = root / "data"
+inputs = data / "preprocessed data for analysis"
+copy2(inputs / "official_media_analysis.csv", data / "official_media_analysis.csv")
+with ZipFile(inputs / "weibo_posts_analysis.zip") as archive:
+    with archive.open("weibo_posts_analysis.csv") as source:
+        (data / "weibo_posts_analysis.csv").write_bytes(source.read())
+```
+
+To repeat earlier stages:
+
+- **Collection:** Use `scripts/web_scraping/official website.py` and `final_weibo_datacollect.py`. Configure dates and sampling settings first; the Weibo workflow runs in Colab with your own cookie. The older `user_initiated_posts.py` and `settings.py` provide the pilot workflow.
+- **Preprocessing:** Copy the cleaned CSVs from `data/cleaned data/` into `data/`, place the four stopword lists named in `preprocess_text.ipynb` under `data/stopwords/`, then run that notebook.
+
+### 3. Run the Analysis
+
+Launch Jupyter from the repository root:
+
+```bash
 python -m notebook
 ```
 
-On Windows, activate the environment with `.venv\Scripts\activate`.
+Run each notebook from top to bottom, in this order:
 
-### Prepare the Inputs
+1. **Vocabulary:** `scripts/topic_modeling/fightin_words_comparison.ipynb`.
+2. **Topics:** `lda_official_media.ipynb`, followed by `lda_weibo_posts.ipynb`, in `scripts/topic_modeling/`.
+3. **Summary:** `scripts/topic_modeling/lda_k12_topic_summary.ipynb`.
+4. **Diagnostics:** `lda_topic_quality.ipynb` and `lda_topic_count_sensitivity.ipynb` in `scripts/diagnostics/`.
 
-- Start with the included preprocessed data to reproduce the vocabulary and topic analyses. Extract `weibo_posts_analysis.zip` first.
-- The notebooks retain their original layout assumptions: create an empty `notebook/` directory in the repository root, and copy both analysis CSVs into `data/`. Open notebooks from the repository root or their own directories.
-- To repeat preprocessing, also copy the two cleaned CSVs into `data/` and supply the four stopword files named in `preprocess_text.ipynb` under `data/stopwords/`.
-- For shared-issue keyword comparisons, supply `data/analysis_results/lda_k12_presentation/k12_keyword_weights.csv`. For attitude analysis, set the script paths and provide its labelled data, model files, and any project modules it imports, including `attitude_lexicon.py` for the dictionary pipeline.
-- To recollect data, use `scripts/web_scraping/official website.py` and `final_weibo_datacollect.py`. Set the intended dates and sampling settings first; the Weibo workflow uses Colab and requires your own cookie. `user_initiated_posts.py` and `settings.py` retain the earlier pilot workflow.
+For shared-issue keyword comparisons, run `lda_shared_issue_keywords.ipynb` after placing `k12_keyword_weights.csv` in `data/analysis_results/lda_k12_presentation/`.
 
-### Run Order
+For attitude analysis, configure the paths and required labelled data/model files in `scripts/attitude_analysis/`, then run the corresponding checks in `scripts/diagnostics/`. The older dictionary pipeline imports the project module `attitude_lexicon.py`. Plotting code is in `scripts/visualization/`; session-dependent plots should follow their matching analysis in the same session.
 
-Run notebook cells from top to bottom:
+### Outputs
 
-1. **Preprocessing, if needed:** `scripts/data_cleaning/preprocess_text.ipynb`.
-2. **Vocabulary comparison:** `scripts/topic_modeling/fightin_words_comparison.ipynb`.
-3. **Topic models:** `lda_official_media.ipynb`, then `lda_weibo_posts.ipynb`, both in `scripts/topic_modeling/`.
-4. **Topic summaries:** `scripts/topic_modeling/lda_k12_topic_summary.ipynb`.
-5. **Topic diagnostics:** `lda_topic_quality.ipynb` and `lda_topic_count_sensitivity.ipynb` in `scripts/diagnostics/`.
-6. **Attitudes and robustness:** Configure inputs in `scripts/attitude_analysis/`, run the chosen attitude model, then the matching checks in `scripts/diagnostics/`. Use `scripts/visualization/` for the corresponding plotting code; some plotting files require variables from the preceding analysis session.
-
-Notebook tables are saved under `data/analysis_results/`; generated plots are saved under `data/generated_figures/`. Earlier project figures remain in `figure/`.
+- **Result tables:** `data/analysis_results/`.
+- **Notebook figures:** `data/generated_figures/`.
+- **Previously saved figures:** `figure/`.
